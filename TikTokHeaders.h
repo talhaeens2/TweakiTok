@@ -83,8 +83,24 @@
 - (void)onDislikeAction:(id)arg1;
 @end
 
+@interface AWECommentCellLayoutInfo: NSObject
+@property (nonatomic, assign) BOOL isTranslateDNTMatched;
+@property (nonatomic, assign) BOOL commentTextTranslatable;
+@property (nonatomic, assign) BOOL shouldShowCommentTranslationLabel;
+@property (nonatomic, assign) BOOL translatingContent;
+@end
+
 @interface AWECommentPanelBaseCell: UITableViewCell
+@property (nonatomic, strong) UIButton *translateButton;
+@property (nonatomic, strong) UIButton *translateNewLineButton;
+@property (nonatomic, strong) id comment;
+@property (nonatomic, strong) AWECommentCellLayoutInfo *layoutInfo;
 - (void)configWithComment:(id)comment;
+- (void)didTapTranslateButton;
+- (BOOL)commentTextTranslatable;
+- (BOOL)shouldShowCommentTranslationLabel;
+- (BOOL)translatingContent;
+- (BOOL)isAnyPartTranslating;
 @end
 @interface TikTokFeedTabControl: UIView
 @end

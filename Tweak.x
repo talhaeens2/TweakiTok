@@ -15,6 +15,7 @@ static NSString *sCurrentActiveAwemeItemID = nil;
 static BOOL sDidResumeCurrentItem = NO;
 static uint64_t sResumeSeq = 0;
 static dispatch_source_t sPlaybackPollTimer = nil;
+static NSMutableSet<NSString *> *sAutoTranslatedCommentIDs = nil;
 
 static NSString *bht_getAwemeItemID(AWEAwemeBaseViewController *vc);
 static void bht_savePlaybackPosition(NSString *itemID, double curr, double total);
@@ -1003,8 +1004,38 @@ static BOOL isAuthenticationShowed = FALSE;
 }
 %end
 
+%hook AWESettingItemModel
+- (NSString *)title {
+    if ([self.identifier isEqualToString:@"bhtiktok_settings"]) {
+        return [BHIManager isTurkish] ? @"TweakiTok Ayarları" : @"TweakiTok Settings";
+    }
+    return %orig;
+}
+- (NSString *)detail {
+    if ([self.identifier isEqualToString:@"bhtiktok_settings"]) {
+        return [BHIManager isTurkish] ? @"TweakiTok Ayarları" : @"TweakiTok Settings";
+    }
+    return %orig;
+}
+%end
+
+%hook UILabel
+- (void)setText:(NSString *)text {
+    if ([text isEqualToString:@"TweakiTok Ayarları"] || [text isEqualToString:@"TweakiTok Settings"]) {
+        text = [BHIManager isTurkish] ? @"TweakiTok Ayarları" : @"TweakiTok Settings";
+    } else if ([text isEqualToString:@"TikTok Mod Ayarları"] || [text isEqualToString:@"TikTok Mod Settings"]) {
+        text = [BHIManager isTurkish] ? @"TikTok Mod Ayarları" : @"TikTok Mod Settings";
+    }
+    %orig(text);
+}
+%end
+
 static void reloadTikTokSettingsTables(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
+        BOOL tr = [BHIManager isTurkish];
+        NSString *targetTitle = tr ? @"TweakiTok Ayarları" : @"TweakiTok Settings";
+        NSString *targetHeader = tr ? @"TikTok Mod Ayarları" : @"TikTok Mod Settings";
+        
         for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
             if ([scene isKindOfClass:[UIWindowScene class]]) {
                 for (UIWindow *w in scene.windows) {
@@ -1012,8 +1043,19 @@ static void reloadTikTokSettingsTables(void) {
                     while (queue.count > 0) {
                         UIView *v = queue.firstObject;
                         [queue removeObjectAtIndex:0];
+                        if ([v isKindOfClass:[UILabel class]]) {
+                            UILabel *lbl = (UILabel *)v;
+                            if ([lbl.text isEqualToString:@"TweakiTok Ayarları"] || [lbl.text isEqualToString:@"TweakiTok Settings"]) {
+                                lbl.text = targetTitle;
+                            } else if ([lbl.text isEqualToString:@"TikTok Mod Ayarları"] || [lbl.text isEqualToString:@"TikTok Mod Settings"]) {
+                                lbl.text = targetHeader;
+                            }
+                        }
                         if ([v isKindOfClass:[UITableView class]]) {
                             [(UITableView *)v reloadData];
+                        }
+                        if ([v isKindOfClass:[UICollectionView class]]) {
+                            [(UICollectionView *)v reloadData];
                         }
                         [queue addObjectsFromArray:v.subviews];
                     }
@@ -1663,6 +1705,10 @@ static void reloadTikTokSettingsTables(void) {
         UIView *commnetView = [self view];
         [commnetView setAlpha:0.90];
     }
+}
+- (void)viewDidDisappear:(BOOL)animated {
+    %orig;
+    [sAutoTranslatedCommentIDs removeAllObjects];
 }
 %end
 
@@ -5774,80 +5820,158 @@ static NSString *cleanCommentTextIfPrefixedWithUsername(NSString *text) {
 }
 %end
 
-static NSMutableSet<NSString *> *sAutoTranslatedCommentIDs = nil;
+%hook AWECommentCellLayoutInfo
+- (BOOL)isTranslateDNTMatched {
+    if ([BHIManager autoTranslateComments]) {
+        return NO;
+    }
+    return %orig;
+}
+%end
 
-static void autoTranslateCommentIfNeeded(id comment, id cell) {
-    if (!comment || ![BHIManager autoTranslateComments]) return;
+static void autoTranslateCommentCell(id cell, id comment) {
+    if (!cell || ![BHIManager autoTranslateComments]) return;
     
     NSString *cid = nil;
-    if ([comment respondsToSelector:@selector(commentID)]) {
-        #pragma clang diagnostic push
-        #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-        cid = [comment performSelector:@selector(commentID)];
-        #pragma clang diagnostic pop
-    } else if ([comment respondsToSelector:@selector(cid)]) {
-        #pragma clang diagnostic push
-        #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-        cid = [comment performSelector:@selector(cid)];
-        #pragma clang diagnostic pop
+    if (comment) {
+        if ([comment respondsToSelector:@selector(commentID)]) {
+            #pragma clang diagnostic push
+            #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+            cid = [comment performSelector:@selector(commentID)];
+            #pragma clang diagnostic pop
+        } else if ([comment respondsToSelector:@selector(cid)]) {
+            #pragma clang diagnostic push
+            #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+            cid = [comment performSelector:@selector(cid)];
+            #pragma clang diagnostic pop
+        }
     }
     
     if (cid && [sAutoTranslatedCommentIDs containsObject:cid]) {
         return;
     }
     
-    dispatch_async(dispatch_get_main_queue(), ^{
+    void (^attemptTranslate)(void) = ^{
         if (cid && [sAutoTranslatedCommentIDs containsObject:cid]) return;
         
-        id layout = nil;
-        if ([comment respondsToSelector:@selector(layoutInfo)]) {
+        UIButton *btn = nil;
+        if ([cell respondsToSelector:@selector(translateButton)]) {
             #pragma clang diagnostic push
             #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-            layout = [comment performSelector:@selector(layoutInfo)];
+            UIButton *b = [cell performSelector:@selector(translateButton)];
             #pragma clang diagnostic pop
+            if (b && !b.hidden && b.alpha > 0.01) {
+                btn = b;
+            }
+        }
+        if (!btn && [cell respondsToSelector:@selector(translateNewLineButton)]) {
+            #pragma clang diagnostic push
+            #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+            UIButton *b = [cell performSelector:@selector(translateNewLineButton)];
+            #pragma clang diagnostic pop
+            if (b && !b.hidden && b.alpha > 0.01) {
+                btn = b;
+            }
+        }
+        if (!btn && [cell isKindOfClass:[UIView class]]) {
+            for (UIView *sub in [(UIView *)cell subviews]) {
+                if ([sub isKindOfClass:[UIButton class]]) {
+                    UIButton *b = (UIButton *)sub;
+                    NSString *title = [b titleForState:UIControlStateNormal];
+                    if (title && ([title containsString:@"Çevir"] || [title containsString:@"Translat"])) {
+                        btn = b;
+                        break;
+                    }
+                }
+                for (UIView *sub2 in [sub subviews]) {
+                    if ([sub2 isKindOfClass:[UIButton class]]) {
+                        UIButton *b = (UIButton *)sub2;
+                        NSString *title = [b titleForState:UIControlStateNormal];
+                        if (title && ([title containsString:@"Çevir"] || [title containsString:@"Translat"])) {
+                            btn = b;
+                            break;
+                        }
+                    }
+                }
+                if (btn) break;
+            }
         }
         
-        if (layout && [layout respondsToSelector:@selector(didTapTranslateButton)]) {
-            BOOL translatable = NO;
-            if ([layout respondsToSelector:@selector(commentTextTranslatable)]) {
-                translatable = ((BOOL (*)(id, SEL))objc_msgSend)(layout, @selector(commentTextTranslatable));
-            } else if ([layout respondsToSelector:@selector(shouldShowCommentTranslationLabel)]) {
-                translatable = ((BOOL (*)(id, SEL))objc_msgSend)(layout, @selector(shouldShowCommentTranslationLabel));
+        if (btn) {
+            NSString *title = [btn titleForState:UIControlStateNormal];
+            if (title && (
+                [title containsString:@"Orijinal"] ||
+                [title containsString:@"Original"])) {
+                return;
             }
-            
-            BOOL translating = NO;
-            if ([layout respondsToSelector:@selector(translatingContent)]) {
-                translating = ((BOOL (*)(id, SEL))objc_msgSend)(layout, @selector(translatingContent));
-            }
-            
-            BOOL dntMatched = NO;
-            if ([layout respondsToSelector:@selector(isTranslateDNTMatched)]) {
-                dntMatched = ((BOOL (*)(id, SEL))objc_msgSend)(layout, @selector(isTranslateDNTMatched));
-            }
-            
-            if (translatable && !translating && !dntMatched) {
-                if (cid) {
-                    if (!sAutoTranslatedCommentIDs) {
-                        sAutoTranslatedCommentIDs = [[NSMutableSet alloc] init];
-                    }
-                    if (sAutoTranslatedCommentIDs.count > 1000) {
-                        [sAutoTranslatedCommentIDs removeAllObjects];
-                    }
-                    [sAutoTranslatedCommentIDs addObject:cid];
+        }
+        
+        BOOL isTranslating = NO;
+        if ([cell respondsToSelector:@selector(translatingContent)]) {
+            isTranslating = ((BOOL (*)(id, SEL))objc_msgSend)(cell, @selector(translatingContent));
+        }
+        if (!isTranslating && [cell respondsToSelector:@selector(isAnyPartTranslating)]) {
+            isTranslating = ((BOOL (*)(id, SEL))objc_msgSend)(cell, @selector(isAnyPartTranslating));
+        }
+        if (isTranslating) return;
+        
+        BOOL translatable = (btn && !btn.hidden);
+        if (!translatable && [cell respondsToSelector:@selector(commentTextTranslatable)]) {
+            translatable = ((BOOL (*)(id, SEL))objc_msgSend)(cell, @selector(commentTextTranslatable));
+        }
+        if (!translatable && [cell respondsToSelector:@selector(shouldShowCommentTranslationLabel)]) {
+            translatable = ((BOOL (*)(id, SEL))objc_msgSend)(cell, @selector(shouldShowCommentTranslationLabel));
+        }
+        
+        if (translatable) {
+            if (cid) {
+                if (!sAutoTranslatedCommentIDs) {
+                    sAutoTranslatedCommentIDs = [[NSMutableSet alloc] init];
                 }
+                if (sAutoTranslatedCommentIDs.count > 2000) {
+                    [sAutoTranslatedCommentIDs removeAllObjects];
+                }
+                [sAutoTranslatedCommentIDs addObject:cid];
+            }
+            if (btn && btn.allTargets.count > 0) {
+                [btn sendActionsForControlEvents:UIControlEventTouchUpInside];
+            } else if ([cell respondsToSelector:@selector(didTapTranslateButton)]) {
                 #pragma clang diagnostic push
                 #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-                [layout performSelector:@selector(didTapTranslateButton)];
+                [cell performSelector:@selector(didTapTranslateButton)];
                 #pragma clang diagnostic pop
             }
         }
-    });
+    };
+    
+    dispatch_async(dispatch_get_main_queue(), attemptTranslate);
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.15 * NSEC_PER_SEC)), dispatch_get_main_queue(), attemptTranslate);
 }
 
 %hook AWECommentPanelBaseCell
 - (void)configWithComment:(id)comment {
     %orig;
-    autoTranslateCommentIfNeeded(comment, self);
+    autoTranslateCommentCell(self, comment);
+}
+- (void)layoutSubviews {
+    %orig;
+    if ([BHIManager autoTranslateComments]) {
+        id c = nil;
+        if ([self respondsToSelector:@selector(comment)]) {
+            #pragma clang diagnostic push
+            #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+            c = [self performSelector:@selector(comment)];
+            #pragma clang diagnostic pop
+        }
+        autoTranslateCommentCell(self, c);
+    }
+}
+%end
+
+%hook AWECommentPanelCell
+- (void)configWithComment:(id)comment {
+    %orig;
+    autoTranslateCommentCell(self, comment);
 }
 %end
 

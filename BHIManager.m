@@ -570,11 +570,13 @@
 + (void)syncWithTikTokLanguageIfNeeded {
     NSString *currentTTLang = [self effectiveTikTokLanguage];
     NSString *lastTTLang = [[NSUserDefaults standardUserDefaults] stringForKey:@"tweakiktok_last_tiktok_language"];
+    BOOL manuallySet = [[NSUserDefaults standardUserDefaults] boolForKey:@"tweakiktok_language_manually_set"];
     
     if (!lastTTLang || lastTTLang.length == 0) {
-        // Initial setup or after reset: adopt TikTok's active language
         [[NSUserDefaults standardUserDefaults] setObject:currentTTLang forKey:@"tweakiktok_last_tiktok_language"];
-        [[NSUserDefaults standardUserDefaults] setObject:currentTTLang forKey:@"tweakiktok_language"];
+        if (!manuallySet) {
+            [[NSUserDefaults standardUserDefaults] setObject:currentTTLang forKey:@"tweakiktok_language"];
+        }
         [[NSUserDefaults standardUserDefaults] synchronize];
         return;
     }
@@ -583,6 +585,7 @@
     if (![currentTTLang isEqualToString:lastTTLang]) {
         [[NSUserDefaults standardUserDefaults] setObject:currentTTLang forKey:@"tweakiktok_last_tiktok_language"];
         [[NSUserDefaults standardUserDefaults] setObject:currentTTLang forKey:@"tweakiktok_language"];
+        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"tweakiktok_language_manually_set"];
         [[NSUserDefaults standardUserDefaults] synchronize];
         [[NSNotificationCenter defaultCenter] postNotificationName:@"TweakiTokLanguageDidChangeNotification" object:currentTTLang];
     }
@@ -595,6 +598,7 @@
         if (![currentTTLang isEqualToString:lastTTLang]) {
             [[NSUserDefaults standardUserDefaults] setObject:currentTTLang forKey:@"tweakiktok_last_tiktok_language"];
             [[NSUserDefaults standardUserDefaults] setObject:currentTTLang forKey:@"tweakiktok_language"];
+            [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"tweakiktok_language_manually_set"];
             [[NSUserDefaults standardUserDefaults] synchronize];
             [[NSNotificationCenter defaultCenter] postNotificationName:@"TweakiTokLanguageDidChangeNotification" object:currentTTLang];
         }
@@ -612,8 +616,7 @@
 + (void)setLanguage:(NSString *)lang {
     if (!lang || lang.length == 0) lang = @"en";
     [[NSUserDefaults standardUserDefaults] setObject:lang forKey:@"tweakiktok_language"];
-    // Keep last_tiktok_language in sync with the current effective TikTok language
-    // so future sync checks know TikTok's language has NOT changed since user chose this language
+    [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"tweakiktok_language_manually_set"];
     NSString *currentTTLang = [self effectiveTikTokLanguage];
     [[NSUserDefaults standardUserDefaults] setObject:currentTTLang forKey:@"tweakiktok_last_tiktok_language"];
     [[NSUserDefaults standardUserDefaults] synchronize];
@@ -785,6 +788,7 @@
     // Offline Videos / Labs Defaults
     [defaults removeObjectForKey:@"offline_videos_limit"];
     [defaults removeObjectForKey:@"ab_overrides"];
+    [defaults removeObjectForKey:@"tweakiktok_language_manually_set"];
     
     // Language Defaults
     [defaults removeObjectForKey:@"tweakiktok_language"];
