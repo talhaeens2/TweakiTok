@@ -82,6 +82,10 @@
 - (void)onLikeAction:(id)arg1;
 - (void)onDislikeAction:(id)arg1;
 @end
+
+@interface AWECommentPanelBaseCell: UITableViewCell
+- (void)configWithComment:(id)comment;
+@end
 @interface TikTokFeedTabControl: UIView
 @end
 
@@ -251,6 +255,27 @@
 @end
 
 @interface TTKSettingsViewModel: AWESettingsBaseViewModel
+@end
+
+@interface TTKSettingsBaseViewController: UIViewController
+- (UITableView *)tableView;
+@end
+
+@interface AWESettingBaseViewController: UIViewController
+- (UITableView *)tableView;
+@end
+
+@interface TTKLanguageViewController: UIViewController
+@end
+
+@interface AWEChooseLanguageViewController: UIViewController
+@end
+
+@interface TTKCommentTranslationConfig: NSObject
+- (BOOL)isCommentAutoTranslationEnabled;
+@end
+
+@interface AWECommentsTranslationController: NSObject
 @end
 
 // 46.5.0: TIKTOKProfileHeaderView/Controller were removed by TikTok; the profile header

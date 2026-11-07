@@ -1026,10 +1026,11 @@ static void reloadTikTokSettingsTables(void) {
 %hook TTKSettingsBaseViewController
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
-    if ([self respondsToSelector:@selector(tableView)]) {
+    id selfObj = (id)self;
+    if ([selfObj respondsToSelector:@selector(tableView)]) {
         #pragma clang diagnostic push
         #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-        id tv = [self performSelector:@selector(tableView)];
+        id tv = [selfObj performSelector:@selector(tableView)];
         #pragma clang diagnostic pop
         if ([tv isKindOfClass:[UITableView class]]) {
             [(UITableView *)tv reloadData];
@@ -1041,10 +1042,11 @@ static void reloadTikTokSettingsTables(void) {
 %hook AWESettingBaseViewController
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
-    if ([self respondsToSelector:@selector(tableView)]) {
+    id selfObj = (id)self;
+    if ([selfObj respondsToSelector:@selector(tableView)]) {
         #pragma clang diagnostic push
         #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-        id tv = [self performSelector:@selector(tableView)];
+        id tv = [selfObj performSelector:@selector(tableView)];
         #pragma clang diagnostic pop
         if ([tv isKindOfClass:[UITableView class]]) {
             [(UITableView *)tv reloadData];
