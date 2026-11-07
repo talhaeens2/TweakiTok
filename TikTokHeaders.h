@@ -50,10 +50,7 @@
 @end
 
 @interface AWEPlayInteractionAuthorView: UIView
-@property (nonatomic, strong) UILabel *timeStampLabel;
-- (void)addSubview:(id)arg1;
 - (NSString *)emojiForCountryCode:(NSString *)countryCode;
-- (BOOL)shouldShowTimeStampLabel;
 @end
 @interface SparkViewController: UIViewController
 @property(nonatomic, strong, readwrite) NSURL *originURL;

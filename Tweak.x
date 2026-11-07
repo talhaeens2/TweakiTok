@@ -28,34 +28,94 @@ static void bht_onActiveVideoChanged(AWEAwemeBaseViewController *newVC);
 static void bht_startPlaybackTracker(TTVideoEngine *engine);
 static void bht_stopPlaybackTracker(void);
 
+static NSString *bht_emojiForCountryCode(NSString *countryCode) {
+    if (!countryCode || ![countryCode isKindOfClass:[NSString class]] || countryCode.length != 2) {
+        return nil;
+    }
+    NSString *uppercaseCountryCode = [countryCode uppercaseString];
+    uint32_t firstLetter = [uppercaseCountryCode characterAtIndex:0] + 0x1F1E6 - 'A';
+    uint32_t secondLetter = [uppercaseCountryCode characterAtIndex:1] + 0x1F1E6 - 'A';
+    NSString *flagEmoji = [[NSString alloc] initWithBytes:&firstLetter length:4 encoding:NSUTF32LittleEndianStringEncoding];
+    flagEmoji = [flagEmoji stringByAppendingString:[[NSString alloc] initWithBytes:&secondLetter length:4 encoding:NSUTF32LittleEndianStringEncoding]];
+    return flagEmoji;
+}
+
 static AWEAwemeModel *bht_getAwemeModelFromView(UIView *view) {
-    if (!view) return nil;
-    UIResponder *r = view;
-    while (r) {
-        if ([r respondsToSelector:@selector(model)]) {
-            #pragma clang diagnostic push
-            #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-            id m = [r performSelector:@selector(model)];
-            #pragma clang diagnostic pop
-            if ([m isKindOfClass:%c(AWEAwemeModel)]) {
-                return (AWEAwemeModel *)m;
+    if (view) {
+        UIResponder *r = view;
+        int depth = 0;
+        while (r && depth++ < 25) {
+            if ([r respondsToSelector:@selector(model)]) {
+                #pragma clang diagnostic push
+                #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+                id m = [r performSelector:@selector(model)];
+                #pragma clang diagnostic pop
+                if ([m isKindOfClass:%c(AWEAwemeModel)]) {
+                    return (AWEAwemeModel *)m;
+                }
             }
-        }
-        if ([r respondsToSelector:@selector(awemeModel)]) {
-            #pragma clang diagnostic push
-            #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-            id m = [r performSelector:@selector(awemeModel)];
-            #pragma clang diagnostic pop
-            if ([m isKindOfClass:%c(AWEAwemeModel)]) {
-                return (AWEAwemeModel *)m;
+            if ([r respondsToSelector:@selector(awemeModel)]) {
+                #pragma clang diagnostic push
+                #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+                id m = [r performSelector:@selector(awemeModel)];
+                #pragma clang diagnostic pop
+                if ([m isKindOfClass:%c(AWEAwemeModel)]) {
+                    return (AWEAwemeModel *)m;
+                }
             }
+            if ([r respondsToSelector:@selector(context)]) {
+                #pragma clang diagnostic push
+                #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+                id ctx = [r performSelector:@selector(context)];
+                #pragma clang diagnostic pop
+                if (ctx && [ctx respondsToSelector:@selector(model)]) {
+                    id m = [ctx performSelector:@selector(model)];
+                    if ([m isKindOfClass:%c(AWEAwemeModel)]) {
+                        return (AWEAwemeModel *)m;
+                    }
+                }
+            }
+            r = [r nextResponder];
         }
-        r = [r nextResponder];
+    }
+    if (sCurrentActiveCell && [sCurrentActiveCell respondsToSelector:@selector(model)]) {
+        id m = [sCurrentActiveCell performSelector:@selector(model)];
+        if ([m isKindOfClass:%c(AWEAwemeModel)]) {
+            return (AWEAwemeModel *)m;
+        }
     }
     if (sCurrentActiveAwemeBaseVC && [sCurrentActiveAwemeBaseVC respondsToSelector:@selector(model)]) {
         return sCurrentActiveAwemeBaseVC.model;
     }
     return nil;
+}
+
+static void bht_refreshAuthorLabelInCell(UIView *cellView) {
+    if (!cellView) return;
+    if (![BHIManager alwaysShowPublishDate] && ![BHIManager uploadRegion] && ![BHIManager showUsername]) {
+        return;
+    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSMutableArray *queue = [NSMutableArray arrayWithObject:cellView];
+        int count = 0;
+        while (queue.count > 0 && count++ < 100) {
+            UIView *v = queue.firstObject;
+            [queue removeObjectAtIndex:0];
+            if ([v isKindOfClass:%c(AWEPlayInteractionAuthorUserNameButton)]) {
+                for (UIView *sub in v.subviews) {
+                    if ([sub isKindOfClass:%c(TUXLabel)]) {
+                        TUXLabel *lbl = (TUXLabel *)sub;
+                        NSString *curr = lbl.text;
+                        if (curr.length > 0) {
+                            [lbl setText:curr];
+                        }
+                    }
+                }
+                break;
+            }
+            [queue addObjectsFromArray:v.subviews];
+        }
+    });
 }
 
 @implementation BHTMenuButton
@@ -1801,37 +1861,59 @@ static NSString *bht_formatPublishDate(NSTimeInterval timestamp) {
 %hook TUXLabel
 - (void)setText:(NSString*)arg1 {
     BOOL isAuthorButton = NO;
-    AWEFeedCellViewController *rootVC = nil;
+    id rootVC = nil;
     if ([[[self superview] superview] isKindOfClass:%c(AWEPlayInteractionAuthorUserNameButton)]) {
         isAuthorButton = YES;
-        rootVC = (AWEFeedCellViewController *)[[[self superview] superview] yy_viewController];
+        rootVC = [[[self superview] superview] yy_viewController];
     } else if ([[self superview] isKindOfClass:%c(AWEPlayInteractionAuthorUserNameButton)]) {
         isAuthorButton = YES;
-        rootVC = (AWEFeedCellViewController *)[[self superview] yy_viewController];
+        rootVC = [[self superview] yy_viewController];
     }
 
     if (isAuthorButton) {
-        AWEAwemeModel *model = (rootVC && [rootVC respondsToSelector:@selector(model)]) ? rootVC.model : bht_getAwemeModelFromView(self);
-        NSString *finalText = arg1;
-
-        if ([BHIManager showUsername] && model.author.socialName.length > 0) {
-            finalText = model.author.socialName;
-        }
-
-        if ([BHIManager alwaysShowPublishDate] && model.createTime != nil && [model.createTime doubleValue] > 0) {
-            BOOL hasExistingDate = [arg1 containsString:@" • "] || [arg1 containsString:@" · "] || [arg1 containsString:@"·"];
-            if (!hasExistingDate) {
-                NSString *formattedDate = bht_formatPublishDate([model.createTime doubleValue]);
-                if (formattedDate.length > 0) {
-                    finalText = [NSString stringWithFormat:@"%@ • %@", finalText, formattedDate];
-                }
-            } else if ([BHIManager showUsername] && [arg1 containsString:@" • "]) {
-                NSArray *components = [arg1 componentsSeparatedByString:@" • "];
-                if (components.count > 1) {
-                    finalText = [NSString stringWithFormat:@"%@ • %@", finalText, components[1]];
-                }
+        AWEAwemeModel *model = nil;
+        if (rootVC && [rootVC respondsToSelector:@selector(model)]) {
+            #pragma clang diagnostic push
+            #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+            id m = [rootVC performSelector:@selector(model)];
+            #pragma clang diagnostic pop
+            if ([m isKindOfClass:%c(AWEAwemeModel)]) {
+                model = (AWEAwemeModel *)m;
             }
         }
+        if (!model) {
+            model = bht_getAwemeModelFromView(self);
+        }
+
+        NSString *baseName = arg1;
+        if (baseName.length > 0) {
+            if ([baseName containsString:@" • "]) {
+                baseName = [baseName componentsSeparatedByString:@" • "].firstObject;
+            } else if ([baseName containsString:@" · "]) {
+                baseName = [baseName componentsSeparatedByString:@" · "].firstObject;
+            }
+        }
+
+        if ([BHIManager showUsername] && model.author.socialName.length > 0) {
+            baseName = model.author.socialName;
+        }
+
+        NSString *finalText = (baseName && baseName.length > 0) ? baseName : arg1;
+
+        if ([BHIManager alwaysShowPublishDate] && model.createTime != nil && [model.createTime doubleValue] > 0) {
+            NSString *formattedDate = bht_formatPublishDate([model.createTime doubleValue]);
+            if (formattedDate.length > 0) {
+                finalText = [NSString stringWithFormat:@"%@ • %@", finalText, formattedDate];
+            }
+        }
+
+        if ([BHIManager uploadRegion] && model && model.region.length > 0) {
+            NSString *flagEmoji = bht_emojiForCountryCode(model.region);
+            if (flagEmoji.length > 0) {
+                finalText = [NSString stringWithFormat:@"%@ • %@", finalText, flagEmoji];
+            }
+        }
+
         %orig(finalText);
         return;
     }
@@ -2624,77 +2706,14 @@ static inline BOOL bht_isEssentialAppEvent(NSString *event) {
 %end
 %hook AWEPlayInteractionAuthorView
 %new - (NSString *)emojiForCountryCode:(NSString *)countryCode {
-    // Convert the country code to uppercase
-    NSString *uppercaseCountryCode = [countryCode uppercaseString];
-    
-    // Ensure the country code has exactly two characters
-    if (uppercaseCountryCode.length != 2) {
-        return nil;
-    }
-    
-    // Convert the country code to the regional indicator symbols
-    uint32_t firstLetter = [uppercaseCountryCode characterAtIndex:0] + 0x1F1E6 - 'A';
-    uint32_t secondLetter = [uppercaseCountryCode characterAtIndex:1] + 0x1F1E6 - 'A';
-    
-    // Create the emoji using the regional indicator symbols
-    NSString *flagEmoji = [[NSString alloc] initWithBytes:&firstLetter length:4 encoding:NSUTF32LittleEndianStringEncoding];
-    flagEmoji = [flagEmoji stringByAppendingString:[[NSString alloc] initWithBytes:&secondLetter length:4 encoding:NSUTF32LittleEndianStringEncoding]];
-    
-    return flagEmoji;
-}
-
-- (BOOL)shouldShowTimeStampLabel {
-    if ([BHIManager alwaysShowPublishDate]) {
-        return YES;
-    }
-    return %orig;
+    return bht_emojiForCountryCode(countryCode);
 }
 
 - (void)layoutSubviews {
     %orig;
-    [[self viewWithTag:666] removeFromSuperview];
-    
-    UIStackView *stackView = nil;
-    for (UIView *sub in [self subviews]) {
-        if ([sub isKindOfClass:[UIStackView class]]) {
-            stackView = (UIStackView *)sub;
-            CGRect f = stackView.frame;
-            if (f.origin.x > 0.1) {
-                f.origin.x = 0;
-                stackView.frame = f;
-            }
-            break;
-        }
-    }
-    
-    if (stackView) {
-        for (UIView *sub in [stackView.arrangedSubviews copy]) {
-            if (sub.tag == 666) {
-                [stackView removeArrangedSubview:sub];
-                [sub removeFromSuperview];
-            }
-        }
-    }
-    
-    AWEAwemeModel *model = bht_getAwemeModelFromView(self);
-    if ([BHIManager uploadRegion] && model) {
-        NSString *countryID = model.region;
-        NSString *countryEmoji = [self emojiForCountryCode:countryID];
-        if (countryEmoji && countryEmoji.length > 0) {
-            UILabel *uploadLabel = [[UILabel alloc] init];
-            uploadLabel.text = [NSString stringWithFormat:@"• %@", countryEmoji];
-            uploadLabel.tag = 666;
-            uploadLabel.textColor = [UIColor whiteColor];
-            uploadLabel.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightRegular];
-            [uploadLabel sizeToFit];
-            
-            if (stackView) {
-                [stackView addArrangedSubview:uploadLabel];
-            } else {
-                uploadLabel.frame = CGRectMake(self.bounds.size.width + 4, 0, 40, 20);
-                [self addSubview:uploadLabel];
-            }
-        }
+    UIView *oldTag = [self viewWithTag:666];
+    if (oldTag) {
+        [oldTag removeFromSuperview];
     }
 }
 %end
@@ -2821,6 +2840,7 @@ static void restoreCurrentVideoFromClearDisplay(void) {
     if ([BHIManager downloadButton]) {
         [self addBHTikTokMenuButton];
     }
+    bht_refreshAuthorLabelInCell(self);
 }
 - (void)configureWithModel:(id)model {
     %orig;
@@ -2837,6 +2857,7 @@ static void restoreCurrentVideoFromClearDisplay(void) {
     if ([BHIManager downloadButton]) {
         [self addBHTikTokMenuButton];
     }
+    bht_refreshAuthorLabelInCell(self);
 }
 - (void)layoutSubviews {
     %orig;
@@ -3433,6 +3454,7 @@ static void restoreCurrentVideoFromClearDisplay(void) {
     if ([BHIManager downloadButton]) {
         [self addBHTikTokMenuButton];
     }
+    bht_refreshAuthorLabelInCell(self);
 }
 - (void)configureWithModel:(id)model {
     %orig;
@@ -3449,6 +3471,7 @@ static void restoreCurrentVideoFromClearDisplay(void) {
     if ([BHIManager downloadButton]) {
         [self addBHTikTokMenuButton];
     }
+    bht_refreshAuthorLabelInCell(self);
 }
 - (void)layoutSubviews {
     %orig;
