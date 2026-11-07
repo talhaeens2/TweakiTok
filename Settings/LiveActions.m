@@ -43,6 +43,9 @@
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    self.title = [BHIManager isTurkish] ? @"Canlı Buton Eylemleri" : @"Live Button Actions";
+    self.liveFuncTitles = [BHIManager isTurkish] ? @[@"Varsayılan", @"TweakiTok Ayarları", @"Oynatma Hızı"] : @[@"Default", @"TweakiTok Settings", @"Playback Speed"];
+    self.navigationItem.rightBarButtonItem.title = [BHIManager isTurkish] ? @"Kapat" : @"Done";
     [self setupNavBarAppearance];
     [self.tableView reloadData];
 }

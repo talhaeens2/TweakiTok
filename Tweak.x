@@ -206,7 +206,7 @@ static void showLikeConfirmation(void (^okHandler)(void)) {
         [[NSUserDefaults standardUserDefaults] setBool:true forKey:@"download_button"];
         [[NSUserDefaults standardUserDefaults] setBool:true forKey:@"download_story"];
         [[NSUserDefaults standardUserDefaults] setBool:true forKey:@"live_record_button"];
-        [[NSUserDefaults standardUserDefaults] setBool:false forKey:@"remove_elements_button"];
+        [[NSUserDefaults standardUserDefaults] setBool:true forKey:@"remove_elements_button"];
         [[NSUserDefaults standardUserDefaults] setBool:true forKey:@"show_porgress_bar"];
         [[NSUserDefaults standardUserDefaults] setBool:true forKey:@"save_profile"];
         [[NSUserDefaults standardUserDefaults] setBool:true forKey:@"copy_profile_information"];
@@ -218,11 +218,14 @@ static void showLikeConfirmation(void (^okHandler)(void)) {
         [[NSUserDefaults standardUserDefaults] setBool:true forKey:@"disable_screenshot_detection"];
         [[NSUserDefaults standardUserDefaults] setBool:false forKey:@"disable_telemetry"];
         [[NSUserDefaults standardUserDefaults] setBool:false forKey:@"always_show_publish_date"];
-        [[NSUserDefaults standardUserDefaults] setBool:false forKey:@"copy_comment_without_username"];
+        [[NSUserDefaults standardUserDefaults] setBool:true forKey:@"copy_comment_without_username"];
         [[NSUserDefaults standardUserDefaults] setBool:false forKey:@"remember_clear_display"];
         [[NSUserDefaults standardUserDefaults] setBool:false forKey:@"resume_video_playback"];
         [[NSUserDefaults standardUserDefaults] setBool:false forKey:@"keep_refresh_rate"];
         [BHIManager syncWithTikTokLanguageIfNeeded];
+    }
+    if (![[NSUserDefaults standardUserDefaults] objectForKey:@"remove_elements_button"]) {
+        [[NSUserDefaults standardUserDefaults] setBool:true forKey:@"remove_elements_button"];
     }
     if (![[NSUserDefaults standardUserDefaults] objectForKey:@"sanitize_links"]) {
         [[NSUserDefaults standardUserDefaults] setBool:true forKey:@"sanitize_links"];
@@ -237,7 +240,7 @@ static void showLikeConfirmation(void (^okHandler)(void)) {
         [[NSUserDefaults standardUserDefaults] setBool:false forKey:@"always_show_publish_date"];
     }
     if (![[NSUserDefaults standardUserDefaults] objectForKey:@"copy_comment_without_username"]) {
-        [[NSUserDefaults standardUserDefaults] setBool:false forKey:@"copy_comment_without_username"];
+        [[NSUserDefaults standardUserDefaults] setBool:true forKey:@"copy_comment_without_username"];
     }
     if (![[NSUserDefaults standardUserDefaults] objectForKey:@"remember_clear_display"]) {
         [[NSUserDefaults standardUserDefaults] setBool:false forKey:@"remember_clear_display"];
@@ -260,7 +263,7 @@ static void showLikeConfirmation(void (^okHandler)(void)) {
         if (![[NSUserDefaults standardUserDefaults] objectForKey:@"download_story"]) {
             [[NSUserDefaults standardUserDefaults] setBool:true forKey:@"download_story"];
         }
-        [[NSUserDefaults standardUserDefaults] setBool:false forKey:@"remove_elements_button"];
+        [[NSUserDefaults standardUserDefaults] setBool:true forKey:@"remove_elements_button"];
         if (![[NSUserDefaults standardUserDefaults] objectForKey:@"download_button"]) {
             [[NSUserDefaults standardUserDefaults] setBool:true forKey:@"download_button"];
         [[NSUserDefaults standardUserDefaults] setBool:true forKey:@"download_story"];
@@ -850,6 +853,26 @@ static BOOL isAuthenticationShowed = FALSE;
     for (id sec in sections) {
         if ([sec respondsToSelector:@selector(sectionIdentifier)] && 
             [[sec sectionIdentifier] isEqualToString:@"tweakitok_mod_section"]) {
+            AWESettingsNormalSectionViewModel *modSec = (AWESettingsNormalSectionViewModel *)sec;
+            BOOL tr = [BHIManager isTurkish];
+            NSString *headerTitle = tr ? @"TikTok Mod Ayarları" : @"TikTok Mod Settings";
+            NSString *rowTitle = tr ? @"TweakiTok Ayarları" : @"TweakiTok Settings";
+            if ([modSec respondsToSelector:@selector(setSectionHeaderTitle:)]) {
+                modSec.sectionHeaderTitle = headerTitle;
+            }
+            if ([modSec respondsToSelector:@selector(bhtiktokCell)]) {
+                TTKSettingsBaseCellPlugin *cellPlugin = [modSec bhtiktokCell];
+                if (cellPlugin && [cellPlugin respondsToSelector:@selector(itemModel)]) {
+                    AWESettingItemModel *im = [cellPlugin itemModel];
+                    if (im && ![im.title isEqualToString:rowTitle]) {
+                        [im setTitle:rowTitle];
+                        [im setDetail:rowTitle];
+                        if ([cellPlugin respondsToSelector:@selector(setItemModel:)]) {
+                            [cellPlugin setItemModel:im];
+                        }
+                    }
+                }
+            }
             return sections;
         }
     }
@@ -936,7 +959,6 @@ static BOOL isAuthenticationShowed = FALSE;
 
 - (NSString *)sectionHeaderTitle {
     if ([self.sectionIdentifier isEqualToString:@"tweakitok_mod_section"]) {
-        [BHIManager syncWithTikTokLanguageIfNeeded];
         BOOL tr = [BHIManager isTurkish];
         return tr ? @"TikTok Mod Ayarları" : @"TikTok Mod Settings";
     }
@@ -945,7 +967,6 @@ static BOOL isAuthenticationShowed = FALSE;
 
 - (NSArray *)modelsArray {
     if ([self.sectionIdentifier isEqualToString:@"tweakitok_mod_section"]) {
-        [BHIManager syncWithTikTokLanguageIfNeeded];
         BOOL tr = [BHIManager isTurkish];
         NSString *title = tr ? @"TweakiTok Ayarları" : @"TweakiTok Settings";
         if (!self.bhtiktokCell) {
@@ -962,13 +983,68 @@ static BOOL isAuthenticationShowed = FALSE;
         } else {
             AWESettingItemModel *itemModel = [self.bhtiktokCell itemModel];
             if (itemModel) {
-                [itemModel setTitle:title];
-                [itemModel setDetail:title];
+                if (![itemModel.title isEqualToString:title]) {
+                    [itemModel setTitle:title];
+                    [itemModel setDetail:title];
+                    if ([self.bhtiktokCell respondsToSelector:@selector(setItemModel:)]) {
+                        [self.bhtiktokCell setItemModel:itemModel];
+                    }
+                }
             }
         }
         return @[self.bhtiktokCell];
     }
     return %orig;
+}
+%end
+
+static void reloadTikTokSettingsTables(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
+            if ([scene isKindOfClass:[UIWindowScene class]]) {
+                for (UIWindow *w in scene.windows) {
+                    NSMutableArray *queue = [NSMutableArray arrayWithObject:w];
+                    while (queue.count > 0) {
+                        UIView *v = queue.firstObject;
+                        [queue removeObjectAtIndex:0];
+                        if ([v isKindOfClass:[UITableView class]]) {
+                            [(UITableView *)v reloadData];
+                        }
+                        [queue addObjectsFromArray:v.subviews];
+                    }
+                }
+            }
+        }
+    });
+}
+
+%hook TTKSettingsBaseViewController
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    if ([self respondsToSelector:@selector(tableView)]) {
+        #pragma clang diagnostic push
+        #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+        id tv = [self performSelector:@selector(tableView)];
+        #pragma clang diagnostic pop
+        if ([tv isKindOfClass:[UITableView class]]) {
+            [(UITableView *)tv reloadData];
+        }
+    }
+}
+%end
+
+%hook AWESettingBaseViewController
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    if ([self respondsToSelector:@selector(tableView)]) {
+        #pragma clang diagnostic push
+        #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+        id tv = [self performSelector:@selector(tableView)];
+        #pragma clang diagnostic pop
+        if ([tv isKindOfClass:[UITableView class]]) {
+            [(UITableView *)tv reloadData];
+        }
+    }
 }
 %end
 
@@ -5690,6 +5766,12 @@ static NSString *cleanCommentTextIfPrefixedWithUsername(NSString *text) {
     }];
     [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification * _Nonnull note) {
         [BHIManager syncWithTikTokLanguageIfNeeded];
+    }];
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"TweakiTokLanguageDidChangeNotification" object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification * _Nonnull note) {
+        reloadTikTokSettingsTables();
+    }];
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"TweakiTokSettingsDidDismissNotification" object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification * _Nonnull note) {
+        reloadTikTokSettingsTables();
     }];
 }
 

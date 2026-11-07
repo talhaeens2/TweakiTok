@@ -67,6 +67,9 @@
     return [[NSUserDefaults standardUserDefaults] boolForKey:@"remove_watermark"];
 }
 + (BOOL)hideElementButton {
+    if ([[NSUserDefaults standardUserDefaults] objectForKey:@"remove_elements_button"] == nil) {
+        return YES;
+    }
     return [[NSUserDefaults standardUserDefaults] boolForKey:@"remove_elements_button"];
 }
 + (BOOL)uploadRegion {
@@ -197,6 +200,9 @@
     return [[NSUserDefaults standardUserDefaults] boolForKey:@"always_show_publish_date"];
 }
 + (BOOL)copyCommentWithoutUsername {
+    if ([[NSUserDefaults standardUserDefaults] objectForKey:@"copy_comment_without_username"] == nil) {
+        return YES;
+    }
     return [[NSUserDefaults standardUserDefaults] boolForKey:@"copy_comment_without_username"];
 }
 + (BOOL)rememberClearDisplay {
@@ -551,58 +557,59 @@
     return [lang hasPrefix:@"tr"];
 }
 
++ (NSString *)effectiveTikTokLanguage {
+    return [self isTikTokLanguageTurkish] ? @"tr" : @"en";
+}
+
 + (void)syncWithTikTokLanguageIfNeeded {
-    NSString *currentTTLang = [self tiktokLanguage];
+    NSString *currentTTLang = [self effectiveTikTokLanguage];
     NSString *lastTTLang = [[NSUserDefaults standardUserDefaults] stringForKey:@"tweakiktok_last_tiktok_language"];
     
     if (!lastTTLang || lastTTLang.length == 0) {
         // Initial setup or after reset: adopt TikTok's active language
         [[NSUserDefaults standardUserDefaults] setObject:currentTTLang forKey:@"tweakiktok_last_tiktok_language"];
-        NSString *initialLang = [self isTikTokLanguageTurkish] ? @"tr" : @"en";
-        [[NSUserDefaults standardUserDefaults] setObject:initialLang forKey:@"tweakiktok_language"];
+        [[NSUserDefaults standardUserDefaults] setObject:currentTTLang forKey:@"tweakiktok_language"];
         [[NSUserDefaults standardUserDefaults] synchronize];
         return;
     }
     
-    // If TikTok's language has changed in TikTok settings
+    // If TikTok's language has actually changed in TikTok settings (e.g. from "tr" to "en" or vice versa)
     if (![currentTTLang isEqualToString:lastTTLang]) {
         [[NSUserDefaults standardUserDefaults] setObject:currentTTLang forKey:@"tweakiktok_last_tiktok_language"];
-        NSString *newLang = [self isTikTokLanguageTurkish] ? @"tr" : @"en";
-        [[NSUserDefaults standardUserDefaults] setObject:newLang forKey:@"tweakiktok_language"];
+        [[NSUserDefaults standardUserDefaults] setObject:currentTTLang forKey:@"tweakiktok_language"];
         [[NSUserDefaults standardUserDefaults] synchronize];
-        [[NSNotificationCenter defaultCenter] postNotificationName:@"TweakiTokLanguageDidChangeNotification" object:newLang];
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"TweakiTokLanguageDidChangeNotification" object:currentTTLang];
     }
 }
 
 + (void)handleTikTokLanguageDidChange {
     dispatch_async(dispatch_get_main_queue(), ^{
-        NSString *currentTTLang = [self tiktokLanguage];
-        [[NSUserDefaults standardUserDefaults] setObject:currentTTLang forKey:@"tweakiktok_last_tiktok_language"];
-        NSString *newLang = [self isTikTokLanguageTurkish] ? @"tr" : @"en";
-        [[NSUserDefaults standardUserDefaults] setObject:newLang forKey:@"tweakiktok_language"];
-        [[NSUserDefaults standardUserDefaults] synchronize];
-        [[NSNotificationCenter defaultCenter] postNotificationName:@"TweakiTokLanguageDidChangeNotification" object:newLang];
+        NSString *currentTTLang = [self effectiveTikTokLanguage];
+        NSString *lastTTLang = [[NSUserDefaults standardUserDefaults] stringForKey:@"tweakiktok_last_tiktok_language"];
+        if (![currentTTLang isEqualToString:lastTTLang]) {
+            [[NSUserDefaults standardUserDefaults] setObject:currentTTLang forKey:@"tweakiktok_last_tiktok_language"];
+            [[NSUserDefaults standardUserDefaults] setObject:currentTTLang forKey:@"tweakiktok_language"];
+            [[NSUserDefaults standardUserDefaults] synchronize];
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"TweakiTokLanguageDidChangeNotification" object:currentTTLang];
+        }
     });
 }
 
 + (NSString *)currentLanguage {
-    [self syncWithTikTokLanguageIfNeeded];
     NSString *lang = [[NSUserDefaults standardUserDefaults] stringForKey:@"tweakiktok_language"];
     if (lang && lang.length > 0) {
         return lang;
     }
-    return [self isTikTokLanguageTurkish] ? @"tr" : @"en";
+    return [self effectiveTikTokLanguage];
 }
 
 + (void)setLanguage:(NSString *)lang {
     if (!lang || lang.length == 0) lang = @"en";
     [[NSUserDefaults standardUserDefaults] setObject:lang forKey:@"tweakiktok_language"];
-    // Keep last_tiktok_language in sync so subsequent sync checks know
-    // TikTok language has NOT changed since the user chose this language in TweakiTok
-    NSString *currentTTLang = [self tiktokLanguage];
-    if (currentTTLang && currentTTLang.length > 0) {
-        [[NSUserDefaults standardUserDefaults] setObject:currentTTLang forKey:@"tweakiktok_last_tiktok_language"];
-    }
+    // Keep last_tiktok_language in sync with the current effective TikTok language
+    // so future sync checks know TikTok's language has NOT changed since user chose this language
+    NSString *currentTTLang = [self effectiveTikTokLanguage];
+    [[NSUserDefaults standardUserDefaults] setObject:currentTTLang forKey:@"tweakiktok_last_tiktok_language"];
     [[NSUserDefaults standardUserDefaults] synchronize];
     [[NSNotificationCenter defaultCenter] postNotificationName:@"TweakiTokLanguageDidChangeNotification" object:lang];
 }
@@ -714,7 +721,7 @@
     [defaults setBool:YES forKey:@"download_button"];
     [defaults setBool:NO forKey:@"share_sheet"];
     [defaults setBool:YES forKey:@"remove_watermark"];
-    [defaults setBool:NO forKey:@"remove_elements_button"];
+    [defaults setBool:YES forKey:@"remove_elements_button"];
     [defaults setBool:NO forKey:@"stop_play"];
     [defaults setBool:YES forKey:@"show_porgress_bar"];
     [defaults setBool:NO forKey:@"transparent_commnet"];
@@ -728,7 +735,7 @@
     [defaults setBool:YES forKey:@"live_record_button"];
     [defaults setBool:YES forKey:@"download_cover_image"];
     [defaults setBool:NO forKey:@"always_show_publish_date"];
-    [defaults setBool:NO forKey:@"copy_comment_without_username"];
+    [defaults setBool:YES forKey:@"copy_comment_without_username"];
     [defaults setBool:NO forKey:@"remember_clear_display"];
     [defaults setBool:NO forKey:@"resume_video_playback"];
     [defaults setBool:NO forKey:@"keep_refresh_rate"];
