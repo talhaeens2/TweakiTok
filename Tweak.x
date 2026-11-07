@@ -28,6 +28,36 @@ static void bht_onActiveVideoChanged(AWEAwemeBaseViewController *newVC);
 static void bht_startPlaybackTracker(TTVideoEngine *engine);
 static void bht_stopPlaybackTracker(void);
 
+static AWEAwemeModel *bht_getAwemeModelFromView(UIView *view) {
+    if (!view) return nil;
+    UIResponder *r = view;
+    while (r) {
+        if ([r respondsToSelector:@selector(model)]) {
+            #pragma clang diagnostic push
+            #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+            id m = [r performSelector:@selector(model)];
+            #pragma clang diagnostic pop
+            if ([m isKindOfClass:%c(AWEAwemeModel)]) {
+                return (AWEAwemeModel *)m;
+            }
+        }
+        if ([r respondsToSelector:@selector(awemeModel)]) {
+            #pragma clang diagnostic push
+            #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+            id m = [r performSelector:@selector(awemeModel)];
+            #pragma clang diagnostic pop
+            if ([m isKindOfClass:%c(AWEAwemeModel)]) {
+                return (AWEAwemeModel *)m;
+            }
+        }
+        r = [r nextResponder];
+    }
+    if (sCurrentActiveAwemeBaseVC && [sCurrentActiveAwemeBaseVC respondsToSelector:@selector(model)]) {
+        return sCurrentActiveAwemeBaseVC.model;
+    }
+    return nil;
+}
+
 @implementation BHTMenuButton
 - (void)setHighlighted:(BOOL)highlighted {
     [super setHighlighted:NO];
@@ -944,7 +974,12 @@ static BOOL isAuthenticationShowed = FALSE;
 
 %hook TTKSettingsBaseCellPlugin
 - (void)didSelectItemAtIndex:(NSInteger)index {
-    if ([self.itemModel.identifier isEqualToString:@"bhtiktok_settings"]) {
+    AWESettingItemModel *im = nil;
+    if ([self respondsToSelector:@selector(itemModel)]) {
+        im = [self itemModel];
+    }
+    NSString *t = im.title;
+    if ((im && im.type == 99) || [t isEqualToString:@"TweakiTok Ayarları"] || [t isEqualToString:@"TweakiTok Settings"]) {
         UIViewController *top = topMostController();
         ViewController *vc = [[ViewController alloc] init];
         UINavigationController *BHTikTokSettings = [[UINavigationController alloc] initWithRootViewController:vc];
@@ -954,9 +989,9 @@ static BOOL isAuthenticationShowed = FALSE;
             }
         }
         [top presentViewController:BHTikTokSettings animated:true completion:nil];
-    } else {
-        return %orig;
+        return;
     }
+    %orig;
 }
 %end
 
@@ -975,58 +1010,19 @@ static BOOL isAuthenticationShowed = FALSE;
     if ([self.sectionIdentifier isEqualToString:@"tweakitok_mod_section"]) {
         BOOL tr = [BHIManager isTurkish];
         NSString *title = tr ? @"TweakiTok Ayarları" : @"TweakiTok Settings";
-        if (!self.bhtiktokCell) {
-            TTKSettingsBaseCellPlugin *BHTikTokSettingsPluginCell = [[%c(TTKSettingsBaseCellPlugin) alloc] initWithPluginContext:self.context];
+        TTKSettingsBaseCellPlugin *BHTikTokSettingsPluginCell = [[%c(TTKSettingsBaseCellPlugin) alloc] initWithPluginContext:self.context];
 
-            AWESettingItemModel *BHTikTokSettingsItemModel = [[%c(AWESettingItemModel) alloc] initWithIdentifier:@"bhtiktok_settings"];
-            [BHTikTokSettingsItemModel setTitle:title];
-            [BHTikTokSettingsItemModel setDetail:title];
-            [BHTikTokSettingsItemModel setIconImage:[UIImage systemImageNamed:@"gear"]];
-            [BHTikTokSettingsItemModel setType:99];
+        AWESettingItemModel *BHTikTokSettingsItemModel = [[%c(AWESettingItemModel) alloc] initWithIdentifier:@"bhtiktok_settings"];
+        [BHTikTokSettingsItemModel setTitle:title];
+        [BHTikTokSettingsItemModel setDetail:title];
+        [BHTikTokSettingsItemModel setIconImage:[UIImage systemImageNamed:@"gear"]];
+        [BHTikTokSettingsItemModel setType:99];
 
-            [BHTikTokSettingsPluginCell setItemModel:BHTikTokSettingsItemModel];
-            self.bhtiktokCell = BHTikTokSettingsPluginCell;
-        } else {
-            AWESettingItemModel *itemModel = [self.bhtiktokCell itemModel];
-            if (itemModel) {
-                if (![itemModel.title isEqualToString:title]) {
-                    [itemModel setTitle:title];
-                    [itemModel setDetail:title];
-                    if ([self.bhtiktokCell respondsToSelector:@selector(setItemModel:)]) {
-                        [self.bhtiktokCell setItemModel:itemModel];
-                    }
-                }
-            }
-        }
+        [BHTikTokSettingsPluginCell setItemModel:BHTikTokSettingsItemModel];
+        self.bhtiktokCell = BHTikTokSettingsPluginCell;
         return @[self.bhtiktokCell];
     }
     return %orig;
-}
-%end
-
-%hook AWESettingItemModel
-- (NSString *)title {
-    if ([self.identifier isEqualToString:@"bhtiktok_settings"]) {
-        return [BHIManager isTurkish] ? @"TweakiTok Ayarları" : @"TweakiTok Settings";
-    }
-    return %orig;
-}
-- (NSString *)detail {
-    if ([self.identifier isEqualToString:@"bhtiktok_settings"]) {
-        return [BHIManager isTurkish] ? @"TweakiTok Ayarları" : @"TweakiTok Settings";
-    }
-    return %orig;
-}
-%end
-
-%hook UILabel
-- (void)setText:(NSString *)text {
-    if ([text isEqualToString:@"TweakiTok Ayarları"] || [text isEqualToString:@"TweakiTok Settings"]) {
-        text = [BHIManager isTurkish] ? @"TweakiTok Ayarları" : @"TweakiTok Settings";
-    } else if ([text isEqualToString:@"TikTok Mod Ayarları"] || [text isEqualToString:@"TikTok Mod Settings"]) {
-        text = [BHIManager isTurkish] ? @"TikTok Mod Ayarları" : @"TikTok Mod Settings";
-    }
-    %orig(text);
 }
 %end
 
@@ -1814,8 +1810,8 @@ static NSString *bht_formatPublishDate(NSTimeInterval timestamp) {
         rootVC = (AWEFeedCellViewController *)[[self superview] yy_viewController];
     }
 
-    if (isAuthorButton && rootVC) {
-        AWEAwemeModel *model = [rootVC respondsToSelector:@selector(model)] ? rootVC.model : nil;
+    if (isAuthorButton) {
+        AWEAwemeModel *model = (rootVC && [rootVC respondsToSelector:@selector(model)]) ? rootVC.model : bht_getAwemeModelFromView(self);
         NSString *finalText = arg1;
 
         if ([BHIManager showUsername] && model.author.socialName.length > 0) {
@@ -1823,16 +1819,16 @@ static NSString *bht_formatPublishDate(NSTimeInterval timestamp) {
         }
 
         if ([BHIManager alwaysShowPublishDate] && model.createTime != nil && [model.createTime doubleValue] > 0) {
-            BOOL hasExistingDate = [arg1 containsString:@" · "] || [arg1 containsString:@" • "] || [arg1 containsString:@"·"];
+            BOOL hasExistingDate = [arg1 containsString:@" • "] || [arg1 containsString:@" · "] || [arg1 containsString:@"·"];
             if (!hasExistingDate) {
                 NSString *formattedDate = bht_formatPublishDate([model.createTime doubleValue]);
                 if (formattedDate.length > 0) {
-                    finalText = [NSString stringWithFormat:@"%@ · %@", finalText, formattedDate];
+                    finalText = [NSString stringWithFormat:@"%@ • %@", finalText, formattedDate];
                 }
-            } else if ([BHIManager showUsername] && [arg1 containsString:@" · "]) {
-                NSArray *components = [arg1 componentsSeparatedByString:@" · "];
+            } else if ([BHIManager showUsername] && [arg1 containsString:@" • "]) {
+                NSArray *components = [arg1 componentsSeparatedByString:@" • "];
                 if (components.count > 1) {
-                    finalText = [NSString stringWithFormat:@"%@ · %@", finalText, components[1]];
+                    finalText = [NSString stringWithFormat:@"%@ • %@", finalText, components[1]];
                 }
             }
         }
@@ -2647,30 +2643,58 @@ static inline BOOL bht_isEssentialAppEvent(NSString *event) {
     return flagEmoji;
 }
 
+- (BOOL)shouldShowTimeStampLabel {
+    if ([BHIManager alwaysShowPublishDate]) {
+        return YES;
+    }
+    return %orig;
+}
+
 - (void)layoutSubviews {
     %orig;
-    if ([BHIManager uploadRegion]){
-        for (int i = 0; i < [[self subviews] count]; i ++){
-            id j = [[self subviews] objectAtIndex:i];
-            if ([j isKindOfClass:%c(UIStackView)]){
-                CGRect frame = [j frame];
-                frame.origin.x = 39.5; 
-                [j setFrame:frame];
-            }else {
-                [[self viewWithTag:666] removeFromSuperview];
+    [[self viewWithTag:666] removeFromSuperview];
+    
+    UIStackView *stackView = nil;
+    for (UIView *sub in [self subviews]) {
+        if ([sub isKindOfClass:[UIStackView class]]) {
+            stackView = (UIStackView *)sub;
+            CGRect f = stackView.frame;
+            if (f.origin.x > 0.1) {
+                f.origin.x = 0;
+                stackView.frame = f;
+            }
+            break;
+        }
+    }
+    
+    if (stackView) {
+        for (UIView *sub in [stackView.arrangedSubviews copy]) {
+            if (sub.tag == 666) {
+                [stackView removeArrangedSubview:sub];
+                [sub removeFromSuperview];
             }
         }
-        [[self viewWithTag:666] removeFromSuperview];
-        AWEFeedCellViewController* rootVC = self.yy_viewController;
-        AWEAwemeModel *model = rootVC.model;
+    }
+    
+    AWEAwemeModel *model = bht_getAwemeModelFromView(self);
+    if ([BHIManager uploadRegion] && model) {
         NSString *countryID = model.region;
-        UILabel *uploadLabel = [[UILabel alloc]initWithFrame:CGRectMake(0,2,39.5,20.5)];
         NSString *countryEmoji = [self emojiForCountryCode:countryID];
-        uploadLabel.text = [NSString stringWithFormat:@"%@ •",countryEmoji];
-        uploadLabel.tag = 666;
-        [uploadLabel setTextColor: [UIColor whiteColor]];
-        [uploadLabel sizeToFit];
-        [self addSubview:uploadLabel];
+        if (countryEmoji && countryEmoji.length > 0) {
+            UILabel *uploadLabel = [[UILabel alloc] init];
+            uploadLabel.text = [NSString stringWithFormat:@"• %@", countryEmoji];
+            uploadLabel.tag = 666;
+            uploadLabel.textColor = [UIColor whiteColor];
+            uploadLabel.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightRegular];
+            [uploadLabel sizeToFit];
+            
+            if (stackView) {
+                [stackView addArrangedSubview:uploadLabel];
+            } else {
+                uploadLabel.frame = CGRectMake(self.bounds.size.width + 4, 0, 40, 20);
+                [self addSubview:uploadLabel];
+            }
+        }
     }
 }
 %end
@@ -5847,13 +5871,23 @@ static void autoTranslateCommentCell(id cell, id comment) {
         }
     }
     
-    if (cid && [sAutoTranslatedCommentIDs containsObject:cid]) {
-        return;
+    if (!cid || cid.length == 0) return;
+    
+    if (!sAutoTranslatedCommentIDs) {
+        sAutoTranslatedCommentIDs = [[NSMutableSet alloc] init];
     }
     
-    void (^attemptTranslate)(void) = ^{
-        if (cid && [sAutoTranslatedCommentIDs containsObject:cid]) return;
-        
+    // Prevent infinite loop: if already processed or translating this comment, exit immediately!
+    if ([sAutoTranslatedCommentIDs containsObject:cid]) {
+        return;
+    }
+    [sAutoTranslatedCommentIDs addObject:cid];
+    if (sAutoTranslatedCommentIDs.count > 2000) {
+        [sAutoTranslatedCommentIDs removeAllObjects];
+        [sAutoTranslatedCommentIDs addObject:cid];
+    }
+    
+    dispatch_async(dispatch_get_main_queue(), ^{
         UIButton *btn = nil;
         if ([cell respondsToSelector:@selector(translateButton)]) {
             #pragma clang diagnostic push
@@ -5897,6 +5931,7 @@ static void autoTranslateCommentCell(id cell, id comment) {
             }
         }
         
+        // If already showing original, DO NOT tap (it is already translated)
         if (btn) {
             NSString *title = [btn titleForState:UIControlStateNormal];
             if (title && (
@@ -5924,15 +5959,6 @@ static void autoTranslateCommentCell(id cell, id comment) {
         }
         
         if (translatable) {
-            if (cid) {
-                if (!sAutoTranslatedCommentIDs) {
-                    sAutoTranslatedCommentIDs = [[NSMutableSet alloc] init];
-                }
-                if (sAutoTranslatedCommentIDs.count > 2000) {
-                    [sAutoTranslatedCommentIDs removeAllObjects];
-                }
-                [sAutoTranslatedCommentIDs addObject:cid];
-            }
             if (btn && btn.allTargets.count > 0) {
                 [btn sendActionsForControlEvents:UIControlEventTouchUpInside];
             } else if ([cell respondsToSelector:@selector(didTapTranslateButton)]) {
@@ -5942,29 +5968,13 @@ static void autoTranslateCommentCell(id cell, id comment) {
                 #pragma clang diagnostic pop
             }
         }
-    };
-    
-    dispatch_async(dispatch_get_main_queue(), attemptTranslate);
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.15 * NSEC_PER_SEC)), dispatch_get_main_queue(), attemptTranslate);
+    });
 }
 
 %hook AWECommentPanelBaseCell
 - (void)configWithComment:(id)comment {
     %orig;
     autoTranslateCommentCell(self, comment);
-}
-- (void)layoutSubviews {
-    %orig;
-    if ([BHIManager autoTranslateComments]) {
-        id c = nil;
-        if ([self respondsToSelector:@selector(comment)]) {
-            #pragma clang diagnostic push
-            #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-            c = [self performSelector:@selector(comment)];
-            #pragma clang diagnostic pop
-        }
-        autoTranslateCommentCell(self, c);
-    }
 }
 %end
 
