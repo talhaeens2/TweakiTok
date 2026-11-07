@@ -175,6 +175,12 @@
 + (BOOL)extendedComment {
     return [[NSUserDefaults standardUserDefaults] boolForKey:@"extendedComment"];
 }
++ (BOOL)autoTranslateComments {
+    if ([[NSUserDefaults standardUserDefaults] objectForKey:@"auto_translate_comments"] == nil) {
+        return YES;
+    }
+    return [[NSUserDefaults standardUserDefaults] boolForKey:@"auto_translate_comments"];
+}
 + (BOOL)uploadHD {
     if ([[NSUserDefaults standardUserDefaults] objectForKey:@"upload_hd"] == nil) {
         return YES;
@@ -739,6 +745,7 @@
     [defaults setBool:NO forKey:@"remember_clear_display"];
     [defaults setBool:NO forKey:@"resume_video_playback"];
     [defaults setBool:NO forKey:@"keep_refresh_rate"];
+    [defaults setBool:YES forKey:@"auto_translate_comments"];
     
     // Profile Defaults
     [defaults setBool:YES forKey:@"save_profile"];

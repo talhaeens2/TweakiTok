@@ -26,6 +26,7 @@ An awesome, modern TikTok tweak for iOS.
 - **Profile Enhancements**: Save HD avatars, copy bio details, and view total video counts.
 - **Always Show Publish Date**: Displays video publish date next to username on all feeds.
 - **Copy Comment Without Username**: Copies comment text without the author's handle.
+- **Auto Translate Comments**: Automatically translates comments into your preferred language on load.
 - **Remember Clear Display**: Keeps clear display mode active when scrolling across videos.
 - **Resume Videos After Scrolling**: Resumes playback from where you left off when returning to a previous video.
 - **Keep Screen Refresh Rate (120 Hz)**: Prevents refresh rate drops in videos, stories, and feed on ProMotion displays.
@@ -57,7 +58,7 @@ Ready-to-install `.deb` packages and modded `.ipa` releases are automatically co
 - [x] **Remember clear display**: Persist clean screen mode across videos.
 - [x] **Keep the screen's refresh rate**: Prevent dropping 90/120 Hz display rate.
 - [x] **Resume videos after scrolling**: Resume playback from previous position.
-- [ ] **Translate comments**: Automatically translate comments on load.
+- [x] **Translate comments**: Automatically translate comments on load.
 - [ ] **Show commenter handle and region**: Show @handle and country flag in comments.
 - [ ] **Show the progress bar thumbnail**: Show preview thumbnail while scrubbing seekbar.
 - [ ] **Keep unsent messages**: Keep deleted/unsent messages in chat.

@@ -45,6 +45,7 @@
 + (BOOL)uploadHD;
 + (BOOL)extendedBio;
 + (BOOL)extendedComment;
++ (BOOL)autoTranslateComments;
 + (BOOL)appLock;
 + (BOOL)disableScreenshotDetection;
 + (BOOL)disableScreenCaptureDetection;

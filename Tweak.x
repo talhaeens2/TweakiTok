@@ -1,5 +1,6 @@
 #import "TikTokHeaders.h"
 #import <objc/runtime.h>
+#import <objc/message.h>
 
 NSArray *jailbreakPaths;
 
@@ -222,6 +223,7 @@ static void showLikeConfirmation(void (^okHandler)(void)) {
         [[NSUserDefaults standardUserDefaults] setBool:false forKey:@"remember_clear_display"];
         [[NSUserDefaults standardUserDefaults] setBool:false forKey:@"resume_video_playback"];
         [[NSUserDefaults standardUserDefaults] setBool:false forKey:@"keep_refresh_rate"];
+        [[NSUserDefaults standardUserDefaults] setBool:true forKey:@"auto_translate_comments"];
         [BHIManager syncWithTikTokLanguageIfNeeded];
     }
     if (![[NSUserDefaults standardUserDefaults] objectForKey:@"remove_elements_button"]) {
@@ -250,6 +252,9 @@ static void showLikeConfirmation(void (^okHandler)(void)) {
     }
     if (![[NSUserDefaults standardUserDefaults] objectForKey:@"keep_refresh_rate"]) {
         [[NSUserDefaults standardUserDefaults] setBool:false forKey:@"keep_refresh_rate"];
+    }
+    if (![[NSUserDefaults standardUserDefaults] objectForKey:@"auto_translate_comments"]) {
+        [[NSUserDefaults standardUserDefaults] setBool:true forKey:@"auto_translate_comments"];
     }
     [BHIManager syncWithTikTokLanguageIfNeeded];
     if (![[NSUserDefaults standardUserDefaults] objectForKey:@"download_cover_image"]) {
@@ -5639,6 +5644,17 @@ static NSString *cleanCommentTextIfPrefixedWithUsername(NSString *text) {
 // NOTE: do NOT hook ABTestMonitor*/exposure paths (tracking) — overrides stay local-only.
 %hook AWEABTestManager
 - (id)getStableValueWithKey:(id)key {
+    if ([BHIManager autoTranslateComments]) {
+        if ([key isEqualToString:@"commentAutoTranslationDefaultEnabled"] ||
+            [key isEqualToString:@"commentAutoTranslation"] ||
+            [key isEqualToString:@"commentAutoTranslationNoTipEnabled"] ||
+            [key isEqualToString:@"enableCommentAutoTranslation"]) {
+            return @(YES);
+        }
+        if ([key isEqualToString:@"commentAutoTranslationDoNotTranslateByDefaultEnabled"]) {
+            return @(NO);
+        }
+    }
     id override = [BHIManager abOverrides][key];
     if (override) {
         return override;
@@ -5646,6 +5662,17 @@ static NSString *cleanCommentTextIfPrefixedWithUsername(NSString *text) {
     return %orig;
 }
 - (id)getUidABTestValue:(id)key stable:(BOOL)stable defaultValue:(id)defaultValue {
+    if ([BHIManager autoTranslateComments]) {
+        if ([key isEqualToString:@"commentAutoTranslationDefaultEnabled"] ||
+            [key isEqualToString:@"commentAutoTranslation"] ||
+            [key isEqualToString:@"commentAutoTranslationNoTipEnabled"] ||
+            [key isEqualToString:@"enableCommentAutoTranslation"]) {
+            return @(YES);
+        }
+        if ([key isEqualToString:@"commentAutoTranslationDoNotTranslateByDefaultEnabled"]) {
+            return @(NO);
+        }
+    }
     id override = [BHIManager abOverrides][key];
     if (override) {
         return override;
@@ -5656,6 +5683,17 @@ static NSString *cleanCommentTextIfPrefixedWithUsername(NSString *text) {
 
 %hook TTKClientABTestService
 - (id)clientABValueFor:(id)key {
+    if ([BHIManager autoTranslateComments]) {
+        if ([key isEqualToString:@"commentAutoTranslationDefaultEnabled"] ||
+            [key isEqualToString:@"commentAutoTranslation"] ||
+            [key isEqualToString:@"commentAutoTranslationNoTipEnabled"] ||
+            [key isEqualToString:@"enableCommentAutoTranslation"]) {
+            return @(YES);
+        }
+        if ([key isEqualToString:@"commentAutoTranslationDoNotTranslateByDefaultEnabled"]) {
+            return @(NO);
+        }
+    }
     id override = [BHIManager abOverrides][key];
     if (override) {
         return override;
@@ -5694,6 +5732,120 @@ static NSString *cleanCommentTextIfPrefixedWithUsername(NSString *text) {
         }
     }
     %orig(range);
+}
+%end
+
+// Auto-Translate Comments (Translate comments on load into user's preferred language)
+%hook TTKCommentTranslationConfig
+- (BOOL)isCommentAutoTranslationEnabled {
+    if ([BHIManager autoTranslateComments]) {
+        return YES;
+    }
+    return %orig;
+}
+- (id)initWithIsCommentAutoTranslationEnabled:(BOOL)arg1 targetLanguageCode:(id)arg2 doNotTranslateLanguageCodes:(id)arg3 {
+    if ([BHIManager autoTranslateComments]) {
+        arg1 = YES;
+    }
+    return %orig(arg1, arg2, arg3);
+}
+%end
+
+%hook AWECommentsTranslationController
+- (BOOL)isCommentEligibleForAutomaticTranslation:(id)comment {
+    if ([BHIManager autoTranslateComments]) {
+        return YES;
+    }
+    return %orig;
+}
+- (BOOL)_shouldTranslateCommentUsingSessionSnapshot:(id)comment {
+    if ([BHIManager autoTranslateComments]) {
+        return YES;
+    }
+    return %orig;
+}
+- (BOOL)_isEligibleForInlineTranslation:(id)comment {
+    if ([BHIManager autoTranslateComments]) {
+        return YES;
+    }
+    return %orig;
+}
+%end
+
+static NSMutableSet<NSString *> *sAutoTranslatedCommentIDs = nil;
+
+static void autoTranslateCommentIfNeeded(id comment, id cell) {
+    if (!comment || ![BHIManager autoTranslateComments]) return;
+    
+    NSString *cid = nil;
+    if ([comment respondsToSelector:@selector(commentID)]) {
+        #pragma clang diagnostic push
+        #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+        cid = [comment performSelector:@selector(commentID)];
+        #pragma clang diagnostic pop
+    } else if ([comment respondsToSelector:@selector(cid)]) {
+        #pragma clang diagnostic push
+        #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+        cid = [comment performSelector:@selector(cid)];
+        #pragma clang diagnostic pop
+    }
+    
+    if (cid && [sAutoTranslatedCommentIDs containsObject:cid]) {
+        return;
+    }
+    
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (cid && [sAutoTranslatedCommentIDs containsObject:cid]) return;
+        
+        id layout = nil;
+        if ([comment respondsToSelector:@selector(layoutInfo)]) {
+            #pragma clang diagnostic push
+            #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+            layout = [comment performSelector:@selector(layoutInfo)];
+            #pragma clang diagnostic pop
+        }
+        
+        if (layout && [layout respondsToSelector:@selector(didTapTranslateButton)]) {
+            BOOL translatable = NO;
+            if ([layout respondsToSelector:@selector(commentTextTranslatable)]) {
+                translatable = ((BOOL (*)(id, SEL))objc_msgSend)(layout, @selector(commentTextTranslatable));
+            } else if ([layout respondsToSelector:@selector(shouldShowCommentTranslationLabel)]) {
+                translatable = ((BOOL (*)(id, SEL))objc_msgSend)(layout, @selector(shouldShowCommentTranslationLabel));
+            }
+            
+            BOOL translating = NO;
+            if ([layout respondsToSelector:@selector(translatingContent)]) {
+                translating = ((BOOL (*)(id, SEL))objc_msgSend)(layout, @selector(translatingContent));
+            }
+            
+            BOOL dntMatched = NO;
+            if ([layout respondsToSelector:@selector(isTranslateDNTMatched)]) {
+                dntMatched = ((BOOL (*)(id, SEL))objc_msgSend)(layout, @selector(isTranslateDNTMatched));
+            }
+            
+            if (translatable && !translating && !dntMatched) {
+                if (cid) {
+                    if (!sAutoTranslatedCommentIDs) {
+                        sAutoTranslatedCommentIDs = [[NSMutableSet alloc] init];
+                    }
+                    if (sAutoTranslatedCommentIDs.count > 1000) {
+                        [sAutoTranslatedCommentIDs removeAllObjects];
+                    }
+                    [sAutoTranslatedCommentIDs addObject:cid];
+                }
+                #pragma clang diagnostic push
+                #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+                [layout performSelector:@selector(didTapTranslateButton)];
+                #pragma clang diagnostic pop
+            }
+        }
+    });
+}
+
+%hook AWECommentPanelBaseCell
+- (void)configWithComment:(id)comment {
+    %orig;
+    autoTranslateCommentIfNeeded(comment, self);
 }
 %end
 

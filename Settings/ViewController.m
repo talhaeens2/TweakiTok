@@ -148,7 +148,7 @@
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     switch (section) {
-        case 0: return 21;
+        case 0: return 22;
         case 1: return 5;
         case 2: return 4;
         case 3: return 10;
@@ -253,6 +253,10 @@
                 return [self createSwitchCellWithTitle:tr ? @"Ekran Yenileme Hızını Koru (120 Hz)" : @"Keep Screen Refresh Rate (120 Hz)"
                                                 Detail:tr ? @"Cihazın desteklediği maksimum yenileme hızını (120 Hz) sürekli aktif tutar, video ve hikayelerde hız düşmesini engeller. Şarjınız daha hızlı tükenir." : @"Keeps the screen refresh rate locked at the device maximum (120 Hz), preventing drops in videos and stories. Drains battery faster."
                                                    Key:@"keep_refresh_rate"];
+            case 21:
+                return [self createSwitchCellWithTitle:tr ? @"Yorumları Otomatik Çevir" : @"Auto Translate Comments"
+                                                Detail:tr ? @"Yorumlar açıldığı anda TikTok dil ayarlarınıza göre otomatik olarak çevrilir" : @"Automatically translate comments on load into your preferred language"
+                                                   Key:@"auto_translate_comments"];
             default:
                 break;
         }
@@ -719,7 +723,7 @@
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     if ([defaults objectForKey:key] != nil) {
         switchView.on = [defaults boolForKey:key];
-    } else if ([key isEqualToString:@"hide_ads"] || [key isEqualToString:@"download_button"] || [key isEqualToString:@"download_story"] || [key isEqualToString:@"live_record_button"] || [key isEqualToString:@"remove_watermark"] || [key isEqualToString:@"upload_hd"] || [key isEqualToString:@"download_cover_image"] || [key isEqualToString:@"follow_status_badge"] || [key isEqualToString:@"show_porgress_bar"] || [key isEqualToString:@"sanitize_links"] || [key isEqualToString:@"disable_screenshot_detection"] || [key isEqualToString:@"remove_elements_button"] || [key isEqualToString:@"copy_comment_without_username"]) {
+    } else if ([key isEqualToString:@"hide_ads"] || [key isEqualToString:@"download_button"] || [key isEqualToString:@"download_story"] || [key isEqualToString:@"live_record_button"] || [key isEqualToString:@"remove_watermark"] || [key isEqualToString:@"upload_hd"] || [key isEqualToString:@"download_cover_image"] || [key isEqualToString:@"follow_status_badge"] || [key isEqualToString:@"show_porgress_bar"] || [key isEqualToString:@"sanitize_links"] || [key isEqualToString:@"disable_screenshot_detection"] || [key isEqualToString:@"remove_elements_button"] || [key isEqualToString:@"copy_comment_without_username"] || [key isEqualToString:@"auto_translate_comments"]) {
         switchView.on = YES;
     } else {
         switchView.on = NO;
