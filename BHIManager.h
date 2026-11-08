@@ -78,4 +78,8 @@
 + (void)showRestartNotification;
 + (void)dismissRestartNotification:(UIView *)toast;
 + (void)resetToDefaults;
++ (void)registerSettingKey:(NSString *)key;
++ (NSSet<NSString *> *)allSettingKeys;
++ (NSDictionary *)exportSettingsPayload;
++ (NSUInteger)importSettingsFromDictionary:(NSDictionary *)jsonDict;
 @end

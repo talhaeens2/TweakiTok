@@ -800,4 +800,170 @@
     [[NSNotificationCenter defaultCenter] postNotificationName:@"TweakiTokRefreshRateDidChangeNotification" object:nil];
 }
 
+static NSMutableSet<NSString *> *s_registeredSettingKeys = nil;
+
++ (void)registerSettingKey:(NSString *)key {
+    if (!key || ![key isKindOfClass:[NSString class]] || key.length == 0) return;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        s_registeredSettingKeys = [NSMutableSet set];
+    });
+    @synchronized (s_registeredSettingKeys) {
+        [s_registeredSettingKeys addObject:key];
+    }
+}
+
++ (BOOL)isKnownBoolKey:(NSString *)key {
+    static NSSet *nonBoolKeys = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        nonBoolKeys = [NSSet setWithObjects:
+            @"following_count",
+            @"follower_count",
+            @"region",
+            @"live_action",
+            @"playback_speed",
+            @"offline_videos_limit",
+            @"ab_overrides",
+            @"tweakiktok_language",
+            @"tweakiktok_last_tiktok_language",
+            nil];
+    });
+    return ![nonBoolKeys containsObject:key];
+}
+
++ (BOOL)defaultBoolValueForKey:(NSString *)key {
+    static NSSet *defaultsTrue = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        defaultsTrue = [NSSet setWithObjects:
+            @"hide_ads",
+            @"download_button",
+            @"download_story",
+            @"live_record_button",
+            @"remove_watermark",
+            @"upload_hd",
+            @"download_cover_image",
+            @"follow_status_badge",
+            @"show_porgress_bar",
+            @"sanitize_links",
+            @"disable_screenshot_detection",
+            @"remove_elements_button",
+            @"copy_comment_without_username",
+            @"auto_translate_comments",
+            @"save_profile",
+            @"copy_profile_information",
+            nil];
+    });
+    return [defaultsTrue containsObject:key];
+}
+
++ (NSSet<NSString *> *)allSettingKeys {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        if (!s_registeredSettingKeys) {
+            s_registeredSettingKeys = [NSMutableSet set];
+        }
+        NSArray *defaultKeys = @[
+            @"hide_ads", @"download_button", @"share_sheet", @"remove_watermark",
+            @"remove_elements_button", @"stop_play", @"show_porgress_bar", @"transparent_commnet",
+            @"show_username", @"disable_unsensitive", @"disable_warnings", @"disable_live",
+            @"skip_recommnedations", @"upload_region", @"download_story", @"live_record_button",
+            @"download_cover_image", @"always_show_publish_date", @"copy_comment_without_username",
+            @"remember_clear_display", @"resume_video_playback", @"keep_refresh_rate",
+            @"auto_translate_comments", @"save_profile", @"copy_profile_information",
+            @"video_like_count", @"video_upload_date", @"follow_status_badge",
+            @"like_confirmation", @"like_comment_confirmation", @"dislike_comment_confirmation",
+            @"follow_confirmation", @"open_in_safari", @"upload_hd", @"extended_bio",
+            @"extendedComment", @"app_lock", @"fake_changes", @"fake_verified",
+            @"flex_en", @"en_region", @"show_region_change", @"en_livefunc",
+            @"playback_en", @"ghost_read_receipts", @"ghost_typing", @"sanitize_links",
+            @"disable_screenshot_detection", @"disable_telemetry",
+            @"following_count", @"follower_count", @"region", @"live_action",
+            @"playback_speed", @"offline_videos_limit", @"ab_overrides",
+            @"tweakiktok_language", @"tweakiktok_language_manually_set"
+        ];
+        [s_registeredSettingKeys addObjectsFromArray:defaultKeys];
+    });
+    @synchronized (s_registeredSettingKeys) {
+        return [s_registeredSettingKeys copy];
+    }
+}
+
++ (NSDictionary *)exportSettingsPayload {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSMutableDictionary *settingsDict = [NSMutableDictionary dictionary];
+    
+    NSSet<NSString *> *allKeys = [self allSettingKeys];
+    for (NSString *key in allKeys) {
+        id val = [defaults objectForKey:key];
+        if (val != nil) {
+            settingsDict[key] = val;
+        } else if ([self isKnownBoolKey:key]) {
+            // Varsayılan açık/kapalı durumunu yansıt
+            settingsDict[key] = @([self defaultBoolValueForKey:key]);
+        }
+    }
+    
+    NSArray *extraKeys = @[
+        @"tweakiktok_language", @"tweakiktok_language_manually_set",
+        @"following_count", @"follower_count", @"playback_speed",
+        @"live_action", @"offline_videos_limit", @"region", @"ab_overrides"
+    ];
+    for (NSString *k in extraKeys) {
+        id v = [defaults objectForKey:k];
+        if (v != nil && settingsDict[k] == nil) {
+            settingsDict[k] = v;
+        }
+    }
+    
+    NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
+    [dateFormatter setLocale:[NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"]];
+    [dateFormatter setDateFormat:@"yyyy-MM-dd HH:mm:ss"];
+    NSString *exportDate = [dateFormatter stringFromDate:[NSDate date]];
+    
+    return @{
+        @"tweak": @"TweakiTok",
+        @"version": @"47.5.3",
+        @"export_date": exportDate ?: @"",
+        @"settings": settingsDict
+    };
+}
+
++ (NSUInteger)importSettingsFromDictionary:(NSDictionary *)jsonDict {
+    if (![jsonDict isKindOfClass:[NSDictionary class]]) {
+        return 0;
+    }
+    
+    NSDictionary *settings = jsonDict[@"settings"];
+    if (![settings isKindOfClass:[NSDictionary class]]) {
+        settings = jsonDict;
+    }
+    
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSUInteger importedCount = 0;
+    
+    NSSet *ignoredKeys = [NSSet setWithObjects:@"tweak", @"version", @"export_date", @"settings", @"bundle_id", nil];
+    
+    for (NSString *key in settings) {
+        if (![key isKindOfClass:[NSString class]] || [ignoredKeys containsObject:key]) {
+            continue;
+        }
+        
+        id value = settings[key];
+        if (value == nil || [value isKindOfClass:[NSNull class]]) {
+            [defaults removeObjectForKey:key];
+        } else {
+            [defaults setObject:value forKey:key];
+        }
+        importedCount++;
+    }
+    
+    [defaults synchronize];
+    [self syncWithTikTokLanguageIfNeeded];
+    [[NSNotificationCenter defaultCenter] postNotificationName:@"TweakiTokRefreshRateDidChangeNotification" object:nil];
+    
+    return importedCount;
+}
+
 @end

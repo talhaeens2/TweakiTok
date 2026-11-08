@@ -6,6 +6,10 @@
 //
 
 #import "ViewController.h"
+#if __has_include(<UniformTypeIdentifiers/UniformTypeIdentifiers.h>)
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
+#endif
+#import <MobileCoreServices/MobileCoreServices.h>
 #import "CountryTable.h"
 #import "LiveActions.h"
 #import "PlaybackSpeed.h"
@@ -108,7 +112,7 @@
 }
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return 13;
+    return 14;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
@@ -139,6 +143,8 @@
         case 11:
             return tr ? @"Dil (Language)" : @"Language (Dil)";
         case 12:
+            return tr ? @"Yedekleme ve Geri Yükleme" : @"Backup & Restore";
+        case 13:
             return tr ? @"Varsayılana Sıfırla" : @"Reset to Defaults";
         default:
             break;
@@ -160,7 +166,8 @@
         case 9: return 1;
         case 10: return 1;
         case 11: return 1;
-        case 12: return 1;
+        case 12: return 2;
+        case 13: return 1;
         default: return 0;
     }
 }
@@ -585,6 +592,54 @@
         switch (indexPath.row) {
             case 0: {
                 UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:nil];
+                cell.textLabel.text = tr ? @"Ayarları Dışa Aktar" : @"Export Settings";
+                cell.detailTextLabel.text = tr ? @"Mevcut tüm ayarları .json dosyası olarak kaydeder" : @"Export all current settings to a .json file";
+                cell.detailTextLabel.textColor = [UIColor systemGrayColor];
+                cell.detailTextLabel.numberOfLines = 0;
+                
+                UIButton *exportBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+                [exportBtn setTitle:tr ? @"Dışa Aktar" : @"Export" forState:UIControlStateNormal];
+                [exportBtn setTitleColor:[UIColor systemBlueColor] forState:UIControlStateNormal];
+                exportBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
+                exportBtn.backgroundColor = [[UIColor systemBlueColor] colorWithAlphaComponent:0.12];
+                exportBtn.layer.cornerRadius = 14;
+                exportBtn.layer.masksToBounds = YES;
+                exportBtn.contentEdgeInsets = UIEdgeInsetsMake(6, 14, 6, 14);
+                [exportBtn sizeToFit];
+                [exportBtn addTarget:self action:@selector(exportSettingsButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
+                cell.accessoryView = exportBtn;
+                cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+                return cell;
+            }
+            case 1: {
+                UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:nil];
+                cell.textLabel.text = tr ? @"Ayarları İçe Aktar" : @"Import Settings";
+                cell.detailTextLabel.text = tr ? @"Yedeklenmiş .json dosyasından ayarları yükler" : @"Restore settings from a .json file";
+                cell.detailTextLabel.textColor = [UIColor systemGrayColor];
+                cell.detailTextLabel.numberOfLines = 0;
+                
+                UIButton *importBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+                [importBtn setTitle:tr ? @"İçe Aktar" : @"Import" forState:UIControlStateNormal];
+                [importBtn setTitleColor:[UIColor systemGreenColor] forState:UIControlStateNormal];
+                importBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
+                importBtn.backgroundColor = [[UIColor systemGreenColor] colorWithAlphaComponent:0.12];
+                importBtn.layer.cornerRadius = 14;
+                importBtn.layer.masksToBounds = YES;
+                importBtn.contentEdgeInsets = UIEdgeInsetsMake(6, 14, 6, 14);
+                [importBtn sizeToFit];
+                [importBtn addTarget:self action:@selector(importSettingsButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
+                cell.accessoryView = importBtn;
+                cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+                return cell;
+            }
+            default:
+                break;
+        }
+    }
+    else if (indexPath.section == 13) {
+        switch (indexPath.row) {
+            case 0: {
+                UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:nil];
                 cell.textLabel.text = tr ? @"Ayarları Sıfırla" : @"Reset Settings";
                 cell.detailTextLabel.text = tr ? @"Tüm ayarları ilk yükleme varsayılanlarına döndürür" : @"Reset all settings back to factory defaults";
                 cell.detailTextLabel.textColor = [UIColor systemGrayColor];
@@ -684,8 +739,165 @@
         }
         [self presentViewController:alert animated:YES completion:nil];
     }
-    else if (indexPath.section == 12 && indexPath.row == 0) {
+    else if (indexPath.section == 12) {
+        [tableView deselectRowAtIndexPath:indexPath animated:YES];
+        if (indexPath.row == 0) {
+            [self exportSettingsButtonTapped:nil];
+        } else if (indexPath.row == 1) {
+            [self importSettingsButtonTapped:nil];
+        }
+    }
+    else if (indexPath.section == 13 && indexPath.row == 0) {
+        [tableView deselectRowAtIndexPath:indexPath animated:YES];
         [self resetSettingsButtonTapped:nil];
+    }
+}
+
+- (void)exportSettingsButtonTapped:(id)sender {
+    BOOL tr = [BHIManager isTurkish];
+    NSDictionary *exportData = [BHIManager exportSettingsPayload];
+    if (!exportData) {
+        UIAlertController *err = [UIAlertController alertControllerWithTitle:tr ? @"Hata" : @"Error"
+                                                                     message:tr ? @"Ayarlar dışa aktarılamadı." : @"Failed to export settings."
+                                                              preferredStyle:UIAlertControllerStyleAlert];
+        [err addAction:[UIAlertAction actionWithTitle:tr ? @"Tamam" : @"OK" style:UIAlertActionStyleCancel handler:nil]];
+        [self presentViewController:err animated:YES completion:nil];
+        return;
+    }
+    
+    NSError *error = nil;
+    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:exportData options:NSJSONWritingPrettyPrinted error:&error];
+    if (error || !jsonData) {
+        UIAlertController *err = [UIAlertController alertControllerWithTitle:tr ? @"Hata" : @"Error"
+                                                                     message:tr ? @"JSON verisi oluşturulamadı." : @"Failed to create JSON data."
+                                                              preferredStyle:UIAlertControllerStyleAlert];
+        [err addAction:[UIAlertAction actionWithTitle:tr ? @"Tamam" : @"OK" style:UIAlertActionStyleCancel handler:nil]];
+        [self presentViewController:err animated:YES completion:nil];
+        return;
+    }
+    
+    NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
+    [dateFormatter setLocale:[NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"]];
+    [dateFormatter setDateFormat:@"ddMMyyyy"];
+    NSString *dateStr = [dateFormatter stringFromDate:[NSDate date]];
+    NSString *fileName = [NSString stringWithFormat:@"TweakiTok-%@.json", dateStr];
+    
+    NSString *tempPath = [NSTemporaryDirectory() stringByAppendingPathComponent:fileName];
+    NSURL *fileURL = [NSURL fileURLWithPath:tempPath];
+    [jsonData writeToURL:fileURL atomically:YES];
+    
+    UIDocumentPickerViewController *picker = nil;
+    if (@available(iOS 14.0, *)) {
+        picker = [[UIDocumentPickerViewController alloc] initForExportingURLs:@[fileURL] asCopy:YES];
+    } else {
+        picker = [[UIDocumentPickerViewController alloc] initWithURL:fileURL inMode:UIDocumentPickerModeExportToService];
+    }
+    picker.delegate = self;
+    picker.modalPresentationStyle = UIModalPresentationFormSheet;
+    
+    if (picker.popoverPresentationController) {
+        UIView *sourceView = [sender isKindOfClass:[UIView class]] ? (UIView *)sender : self.view;
+        picker.popoverPresentationController.sourceView = sourceView;
+        picker.popoverPresentationController.sourceRect = sourceView.bounds;
+        picker.popoverPresentationController.permittedArrowDirections = UIPopoverArrowDirectionAny;
+    }
+    
+    [self presentViewController:picker animated:YES completion:nil];
+}
+
+- (void)importSettingsButtonTapped:(id)sender {
+    UIDocumentPickerViewController *picker = nil;
+#if __has_include(<UniformTypeIdentifiers/UniformTypeIdentifiers.h>)
+    if (@available(iOS 14.0, *)) {
+        UTType *jsonType = [UTType typeWithIdentifier:@"public.json"] ?: UTTypeJSON;
+        if (jsonType) {
+            picker = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:@[jsonType] asCopy:YES];
+        }
+    }
+#endif
+    if (!picker) {
+        picker = [[UIDocumentPickerViewController alloc] initWithDocumentTypes:@[@"public.json", @"public.text", @"public.plain-text", @"public.item"] inMode:UIDocumentPickerModeImport];
+    }
+    picker.delegate = self;
+    picker.allowsMultipleSelection = NO;
+    picker.modalPresentationStyle = UIModalPresentationFormSheet;
+    
+    if (picker.popoverPresentationController) {
+        UIView *sourceView = [sender isKindOfClass:[UIView class]] ? (UIView *)sender : self.view;
+        picker.popoverPresentationController.sourceView = sourceView;
+        picker.popoverPresentationController.sourceRect = sourceView.bounds;
+        picker.popoverPresentationController.permittedArrowDirections = UIPopoverArrowDirectionAny;
+    }
+    
+    [self presentViewController:picker animated:YES completion:nil];
+}
+
+#pragma mark - UIDocumentPickerDelegate
+
+- (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
+    if (urls.count == 0) return;
+    [self handleImportFromURL:urls.firstObject];
+}
+
+- (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentAtURL:(NSURL *)url {
+    [self handleImportFromURL:url];
+}
+
+- (void)handleImportFromURL:(NSURL *)url {
+    BOOL tr = [BHIManager isTurkish];
+    BOOL isAccessing = [url startAccessingSecurityScopedResource];
+    
+    NSFileCoordinator *coordinator = [[NSFileCoordinator alloc] init];
+    NSError *coordError = nil;
+    __block NSData *data = nil;
+    [coordinator coordinateReadingItemAtURL:url options:NSFileCoordinatorReadingWithoutChanges error:&coordError byAccessor:^(NSURL *newURL) {
+        data = [NSData dataWithContentsOfURL:newURL];
+    }];
+    if (!data) {
+        data = [NSData dataWithContentsOfURL:url];
+    }
+    
+    if (isAccessing) {
+        [url stopAccessingSecurityScopedResource];
+    }
+    
+    if (!data || data.length == 0) {
+        UIAlertController *err = [UIAlertController alertControllerWithTitle:tr ? @"Hata" : @"Error"
+                                                                     message:tr ? @"Seçilen dosya okunamadı veya boş." : @"Could not read the selected file or file is empty."
+                                                              preferredStyle:UIAlertControllerStyleAlert];
+        [err addAction:[UIAlertAction actionWithTitle:tr ? @"Tamam" : @"OK" style:UIAlertActionStyleCancel handler:nil]];
+        [self presentViewController:err animated:YES completion:nil];
+        return;
+    }
+    
+    NSError *jsonError = nil;
+    id jsonObj = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError];
+    if (jsonError || ![jsonObj isKindOfClass:[NSDictionary class]]) {
+        UIAlertController *err = [UIAlertController alertControllerWithTitle:tr ? @"Hata" : @"Error"
+                                                                     message:tr ? @"Geçersiz JSON dosyası! Lütfen geçerli bir TweakiTok ayar yedeği seçin." : @"Invalid JSON file! Please select a valid TweakiTok backup."
+                                                              preferredStyle:UIAlertControllerStyleAlert];
+        [err addAction:[UIAlertAction actionWithTitle:tr ? @"Tamam" : @"OK" style:UIAlertActionStyleCancel handler:nil]];
+        [self presentViewController:err animated:YES completion:nil];
+        return;
+    }
+    
+    NSUInteger count = [BHIManager importSettingsFromDictionary:(NSDictionary *)jsonObj];
+    if (count > 0) {
+        [self.staticTable reloadData];
+        [BHIManager showRestartNotification];
+        
+        NSString *msg = tr ? [NSString stringWithFormat:@"%lu ayar başarıyla geri yüklendi. Değişikliklerin etkili olması için uygulamayı yeniden başlatın.", (unsigned long)count] : [NSString stringWithFormat:@"%lu settings restored successfully. Please restart the app for changes to take effect.", (unsigned long)count];
+        UIAlertController *success = [UIAlertController alertControllerWithTitle:tr ? @"Başarılı" : @"Success"
+                                                                         message:msg
+                                                                  preferredStyle:UIAlertControllerStyleAlert];
+        [success addAction:[UIAlertAction actionWithTitle:tr ? @"Tamam" : @"OK" style:UIAlertActionStyleDefault handler:nil]];
+        [self presentViewController:success animated:YES completion:nil];
+    } else {
+        UIAlertController *err = [UIAlertController alertControllerWithTitle:tr ? @"Uyarı" : @"Warning"
+                                                                     message:tr ? @"Dosyada yüklenebilecek ayar bulunamadı." : @"No recognizable settings found in the file."
+                                                              preferredStyle:UIAlertControllerStyleAlert];
+        [err addAction:[UIAlertAction actionWithTitle:tr ? @"Tamam" : @"OK" style:UIAlertActionStyleCancel handler:nil]];
+        [self presentViewController:err animated:YES completion:nil];
     }
 }
 
@@ -715,6 +927,7 @@
 }
 
 - (UITableViewCell *)createSwitchCellWithTitle:(NSString *)title Detail:(NSString*)detail Key:(NSString*)key {
+    [BHIManager registerSettingKey:key];
     UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:nil];
     
     UISwitch *switchView = [[UISwitch alloc] init];

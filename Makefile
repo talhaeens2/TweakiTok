@@ -7,7 +7,7 @@ include $(THEOS)/makefiles/common.mk
 TWEAK_NAME = TweakiTok
 
 TweakiTok_FILES = Tweak.x $(wildcard *.m JGProgressHUD/*.m Settings/*.m)
-TweakiTok_FRAMEWORKS = UIKit Foundation CoreGraphics Photos CoreServices SystemConfiguration SafariServices Security QuartzCore AVFoundation CoreMedia CoreVideo ReplayKit
+TweakiTok_FRAMEWORKS = UIKit Foundation CoreGraphics Photos CoreServices UniformTypeIdentifiers SystemConfiguration SafariServices Security QuartzCore AVFoundation CoreMedia CoreVideo ReplayKit
 TweakiTok_CFLAGS = -fobjc-arc -Wno-unused-variable -Wno-unused-value -Wno-deprecated-declarations -Wno-nullability-completeness -Wno-unused-function -Wno-incompatible-pointer-types
 
 include $(THEOS_MAKE_PATH)/tweak.mk

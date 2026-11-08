@@ -48,6 +48,7 @@ An awesome, modern TikTok tweak for iOS.
 - **Disable Pull to Refresh**: Prevents accidental feed refresh gestures.
 - **Disable Sensitive Content Warnings**: Bypasses intrusive content warning screens.
 - **Restart Notice Banner**: Adaptive toast notification prompting restart when settings change.
+- **Backup & Restore Settings**: Export and import tweak configuration to/from date-stamped .json files directly via the Files app.
 - **Security Bypasses**: Bypasses jailbreak detection and environment checks.
 
 ## GitHub Actions & Prebuilt Releases
@@ -60,7 +61,7 @@ Ready-to-install `.deb` packages and modded `.ipa` releases are automatically co
 - [x] **Keep the screen's refresh rate**: Prevent dropping 90/120 Hz display rate.
 - [x] **Resume videos after scrolling**: Resume playback from previous position.
 - [x] **Translate comments**: Automatically translate comments on load.
-- [ ] **Backup and restore settings**: Export and import tweak settings and configuration.
+- [x] **Backup and restore settings**: Export and import tweak settings and configuration.
 - [x] **Show commenter handle and region**: Show @handle and country flag in comments.
 - [ ] **Show the progress bar thumbnail**: Show preview thumbnail while scrubbing seekbar.
 - [ ] **Keep unsent messages**: Keep deleted/unsent messages in chat.
