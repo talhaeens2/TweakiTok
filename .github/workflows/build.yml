@@ -84,6 +84,7 @@ jobs:
 
           # verify change
           echo "Updated version to: $VERSION"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
           grep "^Version:" control
 
       - name: build rootless variant (arm64 + arm64e)
@@ -107,7 +108,7 @@ jobs:
             exit 1
           fi
           echo "Found dylib at: $DYLIB_PATH"
-          cp "$DYLIB_PATH" artifacts/TweakiTok.dylib
+          cp "$DYLIB_PATH" "artifacts/TweakiTokV${VERSION}.dylib"
 
       - name: build rootful variant (arm64)
         run: |
@@ -145,8 +146,9 @@ jobs:
           # expect exactly 4 files: 1 dylib + 3 debs (rootless / rootful / roothide)
           FILE_COUNT=$(ls -1 artifacts/ | wc -l | tr -d ' ')
           DEB_COUNT=$(ls -1 artifacts/*.deb 2>/dev/null | wc -l | tr -d ' ')
-          if [ "$FILE_COUNT" -ne 4 ] || [ "$DEB_COUNT" -ne 3 ] || [ ! -f artifacts/TweakiTok.dylib ]; then
-            echo "ERROR: expected 4 artifacts (3 debs + TweakiTok.dylib), got $FILE_COUNT files ($DEB_COUNT debs)"
+          DYLIB_COUNT=$(ls -1 artifacts/TweakiTokV*.dylib 2>/dev/null | wc -l | tr -d ' ')
+          if [ "$FILE_COUNT" -ne 4 ] || [ "$DEB_COUNT" -ne 3 ] || [ "$DYLIB_COUNT" -ne 1 ]; then
+            echo "ERROR: expected 4 artifacts (3 debs + TweakiTokV${VERSION}.dylib), got $FILE_COUNT files ($DEB_COUNT debs, $DYLIB_COUNT dylibs)"
             exit 1
           fi
           echo "All 4 artifacts present."
@@ -237,8 +239,9 @@ jobs:
           chmod +x "$APP_PATH/Frameworks/CydiaSubstrate.framework/CydiaSubstrate"
           install_name_tool -id "@rpath/CydiaSubstrate.framework/CydiaSubstrate" "$APP_PATH/Frameworks/CydiaSubstrate.framework/CydiaSubstrate"
 
-          echo "Injecting TweakiTok.dylib into $APP_PATH/$BINARY_NAME..."
-          cp artifacts/TweakiTok.dylib "$APP_PATH/Frameworks/"
+          echo "Injecting TweakiTok into $APP_PATH/$BINARY_NAME..."
+          DYLIB_FILE=$(ls artifacts/TweakiTokV*.dylib | head -n 1)
+          cp "$DYLIB_FILE" "$APP_PATH/Frameworks/TweakiTok.dylib"
           chmod +x "$APP_PATH/Frameworks/TweakiTok.dylib"
           install_name_tool -id "@rpath/TweakiTok.dylib" "$APP_PATH/Frameworks/TweakiTok.dylib"
 
