@@ -1,4 +1,4 @@
-# TweakiTok <img src="https://img.icons8.com/color/48/tiktok--v1.png" width="28" height="28" valign="middle" /> 47.5.3
+# TweakiTok <img src="https://img.icons8.com/color/48/tiktok--v1.png" width="28" height="28" valign="middle" /> 47.6.0
 
 An awesome, modern TikTok tweak for iOS.
 

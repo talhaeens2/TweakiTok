@@ -924,7 +924,7 @@ static NSMutableSet<NSString *> *s_registeredSettingKeys = nil;
     
     return @{
         @"tweak": @"TweakiTok",
-        @"version": @"47.5.3",
+        @"version": @"47.6.0",
         @"export_date": exportDate ?: @"",
         @"settings": settingsDict
     };
