@@ -590,33 +590,32 @@
         }
     }
     else if (indexPath.section == 12) {
+        UIColor *grayBgColor = [UIColor colorWithDynamicProvider:^UIColor * _Nonnull(UITraitCollection * _Nonnull tc) {
+            if (tc.userInterfaceStyle == UIUserInterfaceStyleDark) {
+                return [UIColor colorWithWhite:0.35 alpha:1.0];
+            } else {
+                return [UIColor colorWithWhite:0.86 alpha:1.0];
+            }
+        }];
+        UIColor *btnTitleColor = [UIColor labelColor];
+        
         switch (indexPath.row) {
             case 0: {
                 UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:nil];
+                cell.insetsLayoutMarginsFromSafeArea = NO;
+                cell.preservesSuperviewLayoutMargins = NO;
+                cell.contentView.preservesSuperviewLayoutMargins = NO;
                 cell.textLabel.text = tr ? @"Ayarları Dışa Aktar" : @"Export Settings";
                 cell.detailTextLabel.text = tr ? @"Mevcut tüm ayarları .json dosyası olarak kaydeder" : @"Export all current settings to a .json file";
                 cell.detailTextLabel.textColor = [UIColor systemGrayColor];
                 cell.detailTextLabel.numberOfLines = 0;
-                cell.separatorInset = UIEdgeInsetsMake(0, 16, 0, 2000);
-                
-                UIView *cover = [[UIView alloc] init];
-                cover.backgroundColor = [UIColor systemBackgroundColor];
-                cover.translatesAutoresizingMaskIntoConstraints = NO;
-                cover.userInteractionEnabled = NO;
-                [cell addSubview:cover];
-                [cell bringSubviewToFront:cover];
-                [NSLayoutConstraint activateConstraints:@[
-                    [cover.leadingAnchor constraintEqualToAnchor:cell.leadingAnchor],
-                    [cover.trailingAnchor constraintEqualToAnchor:cell.trailingAnchor],
-                    [cover.bottomAnchor constraintEqualToAnchor:cell.bottomAnchor],
-                    [cover.heightAnchor constraintEqualToConstant:2.0]
-                ]];
+                cell.separatorInset = UIEdgeInsetsMake(0, 10000, 0, 0);
                 
                 UIButton *exportBtn = [UIButton buttonWithType:UIButtonTypeSystem];
                 [exportBtn setTitle:tr ? @"Dışa Aktar" : @"Export" forState:UIControlStateNormal];
-                [exportBtn setTitleColor:[UIColor systemBlueColor] forState:UIControlStateNormal];
+                [exportBtn setTitleColor:btnTitleColor forState:UIControlStateNormal];
                 exportBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
-                exportBtn.backgroundColor = [[UIColor systemBlueColor] colorWithAlphaComponent:0.12];
+                exportBtn.backgroundColor = grayBgColor;
                 exportBtn.layer.cornerRadius = 14;
                 exportBtn.layer.masksToBounds = YES;
                 exportBtn.contentEdgeInsets = UIEdgeInsetsMake(6, 14, 6, 14);
@@ -635,9 +634,9 @@
                 
                 UIButton *importBtn = [UIButton buttonWithType:UIButtonTypeSystem];
                 [importBtn setTitle:tr ? @"İçe Aktar" : @"Import" forState:UIControlStateNormal];
-                [importBtn setTitleColor:[UIColor systemGreenColor] forState:UIControlStateNormal];
+                [importBtn setTitleColor:btnTitleColor forState:UIControlStateNormal];
                 importBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
-                importBtn.backgroundColor = [[UIColor systemGreenColor] colorWithAlphaComponent:0.12];
+                importBtn.backgroundColor = grayBgColor;
                 importBtn.layer.cornerRadius = 14;
                 importBtn.layer.masksToBounds = YES;
                 importBtn.contentEdgeInsets = UIEdgeInsetsMake(6, 14, 6, 14);
@@ -691,6 +690,12 @@
         }
     }
     [self presentViewController:navController animated:YES completion:nil];
+}
+
+- (void)tableView:(UITableView *)tableView willDisplayCell:(UITableViewCell *)cell forRowAtIndexPath:(NSIndexPath *)indexPath {
+    if (indexPath.section == 12 && indexPath.row == 0) {
+        cell.separatorInset = UIEdgeInsetsMake(0, tableView.bounds.size.width + 1000, 0, 0);
+    }
 }
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
