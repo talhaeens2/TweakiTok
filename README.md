@@ -48,7 +48,7 @@ An awesome, modern TikTok tweak for iOS.
 - **Disable Pull to Refresh**: Prevents accidental feed refresh gestures.
 - **Disable Sensitive Content Warnings**: Bypasses intrusive content warning screens.
 - **Restart Notice Banner**: Adaptive toast notification prompting restart when settings change.
-- **Backup & Restore Settings**: Export and import tweak configuration to/from date-stamped .json files directly via the Files app.
+- **Backup & Restore Settings**: Export and import settings to/from date-stamped .json files via Files app.
 - **Security Bypasses**: Bypasses jailbreak detection and environment checks.
 
 ## GitHub Actions & Prebuilt Releases
