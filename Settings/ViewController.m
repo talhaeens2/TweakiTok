@@ -21,6 +21,7 @@
 @property (nonatomic, strong) UITableView *staticTable;
 @property (nonatomic, assign) BOOL isAdditionalCellVisible;
 @property (nonatomic, assign) UIImage *devImage;
+@property (nonatomic, assign) BOOL isExportingSettings;
 @end
 
 @implementation ViewController
@@ -596,6 +597,7 @@
                 cell.detailTextLabel.text = tr ? @"Mevcut tüm ayarları .json dosyası olarak kaydeder" : @"Export all current settings to a .json file";
                 cell.detailTextLabel.textColor = [UIColor systemGrayColor];
                 cell.detailTextLabel.numberOfLines = 0;
+                cell.separatorInset = UIEdgeInsetsMake(0, 10000, 0, 0);
                 
                 UIButton *exportBtn = [UIButton buttonWithType:UIButtonTypeSystem];
                 [exportBtn setTitle:tr ? @"Dışa Aktar" : @"Export" forState:UIControlStateNormal];
@@ -778,7 +780,7 @@
     
     NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
     [dateFormatter setLocale:[NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"]];
-    [dateFormatter setDateFormat:@"ddMMyyyy"];
+    [dateFormatter setDateFormat:@"dd.MM.yyyy"];
     NSString *dateStr = [dateFormatter stringFromDate:[NSDate date]];
     NSString *fileName = [NSString stringWithFormat:@"TweakiTok-%@.json", dateStr];
     
@@ -786,6 +788,7 @@
     NSURL *fileURL = [NSURL fileURLWithPath:tempPath];
     [jsonData writeToURL:fileURL atomically:YES];
     
+    self.isExportingSettings = YES;
     UIDocumentPickerViewController *picker = nil;
     if (@available(iOS 14.0, *)) {
         picker = [[UIDocumentPickerViewController alloc] initForExportingURLs:@[fileURL] asCopy:YES];
@@ -806,6 +809,7 @@
 }
 
 - (void)importSettingsButtonTapped:(id)sender {
+    self.isExportingSettings = NO;
     UIDocumentPickerViewController *picker = nil;
 #if __has_include(<UniformTypeIdentifiers/UniformTypeIdentifiers.h>)
     if (@available(iOS 14.0, *)) {
@@ -836,11 +840,35 @@
 
 - (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
     if (urls.count == 0) return;
+    if (self.isExportingSettings) {
+        self.isExportingSettings = NO;
+        BOOL tr = [BHIManager isTurkish];
+        UIAlertController *success = [UIAlertController alertControllerWithTitle:tr ? @"Başarılı" : @"Success"
+                                                                         message:tr ? @"Ayarlar başarıyla dışa aktarıldı." : @"Settings exported successfully."
+                                                                  preferredStyle:UIAlertControllerStyleAlert];
+        [success addAction:[UIAlertAction actionWithTitle:tr ? @"Tamam" : @"OK" style:UIAlertActionStyleDefault handler:nil]];
+        [self presentViewController:success animated:YES completion:nil];
+        return;
+    }
     [self handleImportFromURL:urls.firstObject];
 }
 
 - (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentAtURL:(NSURL *)url {
+    if (self.isExportingSettings) {
+        self.isExportingSettings = NO;
+        BOOL tr = [BHIManager isTurkish];
+        UIAlertController *success = [UIAlertController alertControllerWithTitle:tr ? @"Başarılı" : @"Success"
+                                                                         message:tr ? @"Ayarlar başarıyla dışa aktarıldı." : @"Settings exported successfully."
+                                                                  preferredStyle:UIAlertControllerStyleAlert];
+        [success addAction:[UIAlertAction actionWithTitle:tr ? @"Tamam" : @"OK" style:UIAlertActionStyleDefault handler:nil]];
+        [self presentViewController:success animated:YES completion:nil];
+        return;
+    }
     [self handleImportFromURL:url];
+}
+
+- (void)documentPickerWasCancelled:(UIDocumentPickerViewController *)controller {
+    self.isExportingSettings = NO;
 }
 
 - (void)handleImportFromURL:(NSURL *)url {
