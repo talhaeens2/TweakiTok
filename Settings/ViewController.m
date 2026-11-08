@@ -597,7 +597,20 @@
                 cell.detailTextLabel.text = tr ? @"Mevcut tüm ayarları .json dosyası olarak kaydeder" : @"Export all current settings to a .json file";
                 cell.detailTextLabel.textColor = [UIColor systemGrayColor];
                 cell.detailTextLabel.numberOfLines = 0;
-                cell.separatorInset = UIEdgeInsetsMake(0, 10000, 0, 0);
+                cell.separatorInset = UIEdgeInsetsMake(0, 16, 0, 2000);
+                
+                UIView *cover = [[UIView alloc] init];
+                cover.backgroundColor = [UIColor systemBackgroundColor];
+                cover.translatesAutoresizingMaskIntoConstraints = NO;
+                cover.userInteractionEnabled = NO;
+                [cell addSubview:cover];
+                [cell bringSubviewToFront:cover];
+                [NSLayoutConstraint activateConstraints:@[
+                    [cover.leadingAnchor constraintEqualToAnchor:cell.leadingAnchor],
+                    [cover.trailingAnchor constraintEqualToAnchor:cell.trailingAnchor],
+                    [cover.bottomAnchor constraintEqualToAnchor:cell.bottomAnchor],
+                    [cover.heightAnchor constraintEqualToConstant:2.0]
+                ]];
                 
                 UIButton *exportBtn = [UIButton buttonWithType:UIButtonTypeSystem];
                 [exportBtn setTitle:tr ? @"Dışa Aktar" : @"Export" forState:UIControlStateNormal];
