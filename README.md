@@ -1,4 +1,4 @@
-# TweakiTok <img src="https://img.icons8.com/color/48/tiktok--v1.png" width="28" height="28" valign="middle" /> 47.6.0
+# TweakiTok [![version](https://img.shields.io/badge/version-1.0.0.98-7A43B6)](https://github.com/talhaeenss/TweakiTok/releases) [![license](https://img.shields.io/badge/license-GPLv3-007ec6)](LICENSE) [![platform](https://img.shields.io/badge/platform-iOS-2ea44f)](#) [![TikTok](https://img.shields.io/badge/TikTok-47.6.0-fe2c55)](#)
 
 An awesome, modern TikTok tweak for iOS.
 
