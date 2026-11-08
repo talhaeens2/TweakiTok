@@ -599,56 +599,61 @@
         }];
         UIColor *btnTitleColor = [UIColor labelColor];
         
-        switch (indexPath.row) {
-            case 0: {
-                UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:nil];
-                cell.insetsLayoutMarginsFromSafeArea = NO;
-                cell.preservesSuperviewLayoutMargins = NO;
-                cell.contentView.preservesSuperviewLayoutMargins = NO;
-                cell.textLabel.text = tr ? @"Ayarları Dışa Aktar" : @"Export Settings";
-                cell.detailTextLabel.text = tr ? @"Mevcut tüm ayarları .json dosyası olarak kaydeder" : @"Export all current settings to a .json file";
-                cell.detailTextLabel.textColor = [UIColor systemGrayColor];
-                cell.detailTextLabel.numberOfLines = 0;
-                cell.separatorInset = UIEdgeInsetsMake(0, 10000, 0, 0);
-                
-                UIButton *exportBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-                [exportBtn setTitle:tr ? @"Dışa Aktar" : @"Export" forState:UIControlStateNormal];
-                [exportBtn setTitleColor:btnTitleColor forState:UIControlStateNormal];
-                exportBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
-                exportBtn.backgroundColor = grayBgColor;
-                exportBtn.layer.cornerRadius = 14;
-                exportBtn.layer.masksToBounds = YES;
-                exportBtn.contentEdgeInsets = UIEdgeInsetsMake(6, 14, 6, 14);
-                [exportBtn sizeToFit];
-                [exportBtn addTarget:self action:@selector(exportSettingsButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
-                cell.accessoryView = exportBtn;
-                cell.selectionStyle = UITableViewCellSelectionStyleDefault;
-                return cell;
-            }
-            case 1: {
-                UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:nil];
-                cell.textLabel.text = tr ? @"Ayarları İçe Aktar" : @"Import Settings";
-                cell.detailTextLabel.text = tr ? @"Yedeklenmiş .json dosyasından ayarları yükler" : @"Restore settings from a .json file";
-                cell.detailTextLabel.textColor = [UIColor systemGrayColor];
-                cell.detailTextLabel.numberOfLines = 0;
-                
-                UIButton *importBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-                [importBtn setTitle:tr ? @"İçe Aktar" : @"Import" forState:UIControlStateNormal];
-                [importBtn setTitleColor:btnTitleColor forState:UIControlStateNormal];
-                importBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
-                importBtn.backgroundColor = grayBgColor;
-                importBtn.layer.cornerRadius = 14;
-                importBtn.layer.masksToBounds = YES;
-                importBtn.contentEdgeInsets = UIEdgeInsetsMake(6, 14, 6, 14);
-                [importBtn sizeToFit];
-                [importBtn addTarget:self action:@selector(importSettingsButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
-                cell.accessoryView = importBtn;
-                cell.selectionStyle = UITableViewCellSelectionStyleDefault;
-                return cell;
-            }
-            default:
-                break;
+        UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
+        cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+        
+        UILabel *titleLabel = [[UILabel alloc] init];
+        titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+        titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightRegular];
+        titleLabel.textColor = [UIColor labelColor];
+        [cell.contentView addSubview:titleLabel];
+        
+        UILabel *detailLabel = [[UILabel alloc] init];
+        detailLabel.translatesAutoresizingMaskIntoConstraints = NO;
+        detailLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
+        detailLabel.textColor = [UIColor systemGrayColor];
+        detailLabel.numberOfLines = 0;
+        [cell.contentView addSubview:detailLabel];
+        
+        UIButton *actionBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+        actionBtn.translatesAutoresizingMaskIntoConstraints = NO;
+        [actionBtn setTitleColor:btnTitleColor forState:UIControlStateNormal];
+        actionBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
+        actionBtn.backgroundColor = grayBgColor;
+        actionBtn.layer.cornerRadius = 14;
+        actionBtn.layer.masksToBounds = YES;
+        actionBtn.contentEdgeInsets = UIEdgeInsetsMake(6, 14, 6, 14);
+        [cell.contentView addSubview:actionBtn];
+        
+        [NSLayoutConstraint activateConstraints:@[
+            [actionBtn.trailingAnchor constraintEqualToAnchor:cell.contentView.trailingAnchor constant:-16],
+            [actionBtn.centerYAnchor constraintEqualToAnchor:cell.contentView.centerYAnchor],
+            
+            [titleLabel.leadingAnchor constraintEqualToAnchor:cell.contentView.leadingAnchor constant:16],
+            [titleLabel.topAnchor constraintEqualToAnchor:cell.contentView.topAnchor constant:11],
+            [titleLabel.trailingAnchor constraintLessThanOrEqualToAnchor:actionBtn.leadingAnchor constant:-12],
+            
+            [detailLabel.leadingAnchor constraintEqualToAnchor:cell.contentView.leadingAnchor constant:16],
+            [detailLabel.topAnchor constraintEqualToAnchor:titleLabel.bottomAnchor constant:3],
+            [detailLabel.trailingAnchor constraintLessThanOrEqualToAnchor:actionBtn.leadingAnchor constant:-12],
+            [detailLabel.bottomAnchor constraintEqualToAnchor:cell.contentView.bottomAnchor constant:-11],
+        ]];
+        
+        if (indexPath.row == 0) {
+            titleLabel.text = tr ? @"Ayarları Dışa Aktar" : @"Export Settings";
+            detailLabel.text = tr ? @"Mevcut tüm ayarları .json dosyası olarak kaydeder" : @"Export all current settings to a .json file";
+            [actionBtn setTitle:tr ? @"Dışa Aktar" : @"Export" forState:UIControlStateNormal];
+            [actionBtn addTarget:self action:@selector(exportSettingsButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
+            cell.separatorInset = UIEdgeInsetsMake(0, 10000, 0, 0);
+        } else {
+            titleLabel.text = tr ? @"Ayarları İçe Aktar" : @"Import Settings";
+            detailLabel.text = tr ? @"Yedeklenmiş .json dosyasından ayarları yükler" : @"Restore settings from a .json file";
+            [actionBtn setTitle:tr ? @"İçe Aktar" : @"Import" forState:UIControlStateNormal];
+            [actionBtn addTarget:self action:@selector(importSettingsButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
+            cell.separatorInset = UIEdgeInsetsMake(0, 16, 0, 0);
         }
+        
+        return cell;
     }
     else if (indexPath.section == 13) {
         switch (indexPath.row) {
