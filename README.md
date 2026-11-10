@@ -1,4 +1,4 @@
-# TweakiTok [![TikTok](https://img.shields.io/badge/TikTok-47.6.0-fe2c55)](#) [![version](https://img.shields.io/badge/version-1.0.0.98-7A43B6)](https://github.com/talhaeenss/TweakiTok/releases) [![platform](https://img.shields.io/badge/platform-iOS-2ea44f)](#) [![license](https://img.shields.io/badge/license-GPLv3-007ec6)](LICENSE)
+# TweakiTok [![TikTok](https://img.shields.io/badge/TikTok-47.7.0-fe2c55)](#) [![version](https://img.shields.io/badge/version-1.0.0.98-7A43B6)](https://github.com/talhaeenss/TweakiTok/releases) [![platform](https://img.shields.io/badge/platform-iOS-2ea44f)](#) [![license](https://img.shields.io/badge/license-GPLv3-007ec6)](LICENSE)
 
 An awesome, modern TikTok tweak for iOS that blocks ads and unlocks more features.
 
