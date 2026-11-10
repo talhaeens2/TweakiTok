@@ -63,6 +63,7 @@ Ready-to-install `.deb` packages and modded `.ipa` releases are automatically co
 - [x] **Translate comments**: Automatically translate comments on load.
 - [x] **Backup and restore settings**: Export and import tweak settings and configuration.
 - [x] **Show commenter handle and region**: Show @handle and country flag in comments.
+- [ ] **Download comment stickers**: Add download button for stickers in comments.
 - [ ] **Show the progress bar thumbnail**: Show preview thumbnail while scrubbing seekbar.
 - [ ] **Keep unsent messages**: Keep deleted/unsent messages in chat.
 - [ ] **Ghost mode**: Hide view history, online presence, read receipts & typing.
