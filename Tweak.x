@@ -6245,44 +6245,6 @@ static void bht_saveCommentStickerFromImageView(BDImageView *imageView) {
 }
 %end
 
-%hook UILongPressGestureRecognizer
-- (void)setState:(UIGestureRecognizerState)state {
-    %orig;
-    if (state == UIGestureRecognizerStateBegan && [BHIManager downloadCommentStickers]) {
-        bht_scheduleTooltipEnrichment();
-    }
-}
-%end
-
-%hook UILabel
-- (void)didMoveToWindow {
-    %orig;
-    if (self.window && [BHIManager downloadCommentStickers]) {
-        NSString *t = self.text;
-        if (t && ([t containsString:@"Çıkartma"] || [t containsString:@"çıkartma"] || [t containsString:@"Sticker"] || [t containsString:@"sticker"])) {
-            bht_scheduleTooltipEnrichment();
-        }
-    }
-}
-- (void)setText:(NSString *)text {
-    %orig;
-    if (self.window && [BHIManager downloadCommentStickers]) {
-        if (text && ([text containsString:@"Çıkartma"] || [text containsString:@"çıkartma"] || [text containsString:@"Sticker"] || [text containsString:@"sticker"])) {
-            bht_scheduleTooltipEnrichment();
-        }
-    }
-}
-%end
-
-%hook UIWindow
-- (void)addSubview:(UIView *)view {
-    %orig;
-    if ([BHIManager downloadCommentStickers]) {
-        bht_scheduleTooltipEnrichment();
-    }
-}
-%end
-
 %hook UIView
 %new - (void)bht_downloadStickerAction {
     BDImageView *targetView = sLastActiveStickerView;
@@ -6865,7 +6827,6 @@ static void bht_setupPanelFullRowStickerDownload(UIViewController *vc) {
 %end
 
 %ctor {
-    TTK_SetupGlobalCrashLogger();
     jailbreakPaths = @[
         @"/Applications/Cydia.app", @"/Applications/blackra1n.app",
         @"/Applications/FakeCarrier.app", @"/Applications/Icy.app",
@@ -6900,6 +6861,7 @@ static void bht_setupPanelFullRowStickerDownload(UIViewController *vc) {
     dispatch_async(dispatch_get_main_queue(), ^{
         [[BHTRefreshRateManager sharedManager] updateRefreshRate];
         [BHIManager syncWithTikTokLanguageIfNeeded];
+        TTK_SetupGlobalCrashLogger();
     });
     [[NSNotificationCenter defaultCenter] addObserverForName:@"ALPLocalizationsLanguageChangedNotification" object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification * _Nonnull note) {
         [BHIManager handleTikTokLanguageDidChange];

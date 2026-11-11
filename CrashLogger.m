@@ -238,6 +238,38 @@ static void TTK_SignalCrashHandler(int sig, siginfo_t *info, void *context) {
     raise(sig);
 }
 
+static BOOL sHandlersInstalled = NO;
+
+static void TTK_InstallHandlersIfNeeded(void) {
+    if (sHandlersInstalled) return;
+    sHandlersInstalled = YES;
+    
+    // 1. Uncaught Exception Handler kur
+    sPreviousExceptionHandler = NSGetUncaughtExceptionHandler();
+    NSSetUncaughtExceptionHandler(&TTK_UncaughtExceptionHandler);
+    
+    // 2. Sinyal çöküşleri için yedek stack (sigaltstack) tahsis et
+    stack_t ss;
+    ss.ss_sp = sAlternateStack;
+    ss.ss_size = sizeof(sAlternateStack);
+    ss.ss_flags = 0;
+    sigaltstack(&ss, NULL);
+    
+    // 3. POSIX Sinyallerini dinle (SIGTRAP/SIGFPE hariç tutularak anti-cheat/debugger çakışması önlendi)
+    int signals[] = {SIGSEGV, SIGBUS, SIGABRT, SIGILL};
+    for (int i = 0; i < sizeof(signals) / sizeof(signals[0]); i++) {
+        int sig = signals[i];
+        struct sigaction sa;
+        memset(&sa, 0, sizeof(sa));
+        sa.sa_sigaction = TTK_SignalCrashHandler;
+        sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
+        sigemptyset(&sa.sa_mask);
+        
+        sigaction(sig, &sa, &sPreviousSigActions[sig]);
+    }
+    NSLog(@"[TweakiTok] Global Crash Logger handlers successfully installed.");
+}
+
 void TTK_SetupGlobalCrashLogger(void) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
@@ -250,40 +282,22 @@ void TTK_SetupGlobalCrashLogger(void) {
             strncpy(sCrashLogPath, [filePath UTF8String], sizeof(sCrashLogPath) - 1);
         }
         
-        // 2. Geliştirici Modu durumunu önbelleğe al ve değişiklikleri dinle
+        // 2. Geliştirici Modu durumunu kontrol et
         sDeveloperModeCached = [[NSUserDefaults standardUserDefaults] boolForKey:@"developer_mode"];
+        if (sDeveloperModeCached) {
+            TTK_InstallHandlersIfNeeded();
+        }
+        
+        // 3. Ayar açılırsa dinamik olarak handler'ları kur
         [[NSNotificationCenter defaultCenter] addObserverForName:NSUserDefaultsDidChangeNotification
                                                           object:nil
                                                            queue:[NSOperationQueue mainQueue]
                                                       usingBlock:^(NSNotification * _Nonnull note) {
             sDeveloperModeCached = [[NSUserDefaults standardUserDefaults] boolForKey:@"developer_mode"];
+            if (sDeveloperModeCached) {
+                TTK_InstallHandlersIfNeeded();
+            }
         }];
-        
-        // 3. Uncaught Exception Handler kur
-        sPreviousExceptionHandler = NSGetUncaughtExceptionHandler();
-        NSSetUncaughtExceptionHandler(&TTK_UncaughtExceptionHandler);
-        
-        // 4. Sinyal çöküşleri için yedek stack (sigaltstack) tahsis et
-        stack_t ss;
-        ss.ss_sp = sAlternateStack;
-        ss.ss_size = sizeof(sAlternateStack);
-        ss.ss_flags = 0;
-        sigaltstack(&ss, NULL);
-        
-        // 5. POSIX Sinyallerini dinle
-        int signals[] = {SIGSEGV, SIGBUS, SIGABRT, SIGILL, SIGFPE, SIGTRAP};
-        for (int i = 0; i < sizeof(signals) / sizeof(signals[0]); i++) {
-            int sig = signals[i];
-            struct sigaction sa;
-            memset(&sa, 0, sizeof(sa));
-            sa.sa_sigaction = TTK_SignalCrashHandler;
-            sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
-            sigemptyset(&sa.sa_mask);
-            
-            sigaction(sig, &sa, &sPreviousSigActions[sig]);
-        }
-        
-        NSLog(@"[TweakiTok] Global Crash Logger successfully initialized. Crash log target: %s", sCrashLogPath);
     });
 }
 
