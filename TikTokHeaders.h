@@ -35,6 +35,8 @@
 - (void)handleLongPress:(UILongPressGestureRecognizer *)sender;
 - (void)addHandleLongPress;
 - (id)bd_baseImage;
+- (NSData *)bd_animatedImageData;
+- (BOOL)bht_isCommentSticker;
 - (void)image:(UIImage *)image didFinishSavingWithError:(NSError *)error contextInfo:(void *)contextInfo;
 @end
 
@@ -509,14 +511,32 @@
 @property(nonatomic) NSString *subtitle;
 @property(nonatomic) NSString *imageLabel;
 @property(nonatomic) UIImage *image;
++ (instancetype)actionWithStyle:(NSUInteger)style title:(NSString *)title subtitle:(NSString *)subtitle image:(UIImage *)image imageLabel:(NSString *)imageLabel handler:(void (^ __nullable)(TUXActionSheetAction *action))handler;
++ (instancetype)actionWithStyle:(NSUInteger)style title:(NSString *)title subtitle:(NSString *)subtitle image:(UIImage *)image handler:(void (^ __nullable)(TUXActionSheetAction *action))handler;
++ (instancetype)actionWithStyle:(NSUInteger)style title:(NSString *)title handler:(void (^ __nullable)(TUXActionSheetAction *action))handler;
 - (instancetype)initWithStyle:(NSUInteger)style title:(NSString *)title subtitle:(NSString *)subtitle image:(UIImage *)image imageLabel:(NSString *)imageLabel handler:(void (^ __nullable)(TUXActionSheetAction *action))handler;
 @end
 
 @interface TUXActionSheetController: UIViewController
 @property(nonatomic, assign, readwrite) BOOL dismissOnDraggingDown;
 @property(nonatomic, strong, readwrite) UITableView *tableView;
+@property(nonatomic, readonly) NSArray<TUXActionSheetAction *> *actions;
 - (instancetype)initWithTitle:(NSString *)title;
 - (void)addAction:(TUXActionSheetAction *)action;
+@end
+
+@interface TTKCommentListRowActionContext: NSObject
+@property (nonatomic, strong) id comment;
+@property (nonatomic, strong) id commentModel;
+@property (nonatomic, strong) id cell;
+@property (nonatomic, strong) NSIndexPath *indexPath;
+@end
+
+@interface TTKCommentListRowActionHandler: NSObject
+@property (nonatomic, strong) TTKCommentListRowActionContext *context;
+@property (nonatomic, strong) id selectedComment;
+- (void)showActionSheetController:(TUXActionSheetController *)controller;
+- (void)showActionSheetAtIndexPath:(id)indexPath;
 @end
 
 @interface AWEPlayInteractionLikeElement : NSObject

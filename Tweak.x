@@ -315,6 +315,7 @@ static void showLikeConfirmation(void (^okHandler)(void)) {
         [[NSUserDefaults standardUserDefaults] setBool:false forKey:@"resume_video_playback"];
         [[NSUserDefaults standardUserDefaults] setBool:false forKey:@"keep_refresh_rate"];
         [[NSUserDefaults standardUserDefaults] setBool:true forKey:@"auto_translate_comments"];
+        [[NSUserDefaults standardUserDefaults] setBool:true forKey:@"download_comment_stickers"];
         [BHIManager syncWithTikTokLanguageIfNeeded];
     }
     if (![[NSUserDefaults standardUserDefaults] objectForKey:@"remove_elements_button"]) {
@@ -353,6 +354,9 @@ static void showLikeConfirmation(void (^okHandler)(void)) {
     }
     if (![[NSUserDefaults standardUserDefaults] objectForKey:@"follow_status_badge"]) {
         [[NSUserDefaults standardUserDefaults] setBool:true forKey:@"follow_status_badge"];
+    }
+    if (![[NSUserDefaults standardUserDefaults] objectForKey:@"download_comment_stickers"]) {
+        [[NSUserDefaults standardUserDefaults] setBool:true forKey:@"download_comment_stickers"];
     }
     if (![[NSUserDefaults standardUserDefaults] objectForKey:@"BHTikTokV2ButtonsMigrated"]) {
         [[NSUserDefaults standardUserDefaults] setBool:true forKey:@"BHTikTokV2ButtonsMigrated"];
@@ -865,34 +869,107 @@ static BOOL isAuthenticationShowed = FALSE;
 
 
 %hook BDImageView
-- (void)layoutSubviews { // Profile save
+- (void)layoutSubviews {
     %orig;
-    if ([BHIManager profileSave]) {
+    if ([BHIManager profileSave] || [BHIManager downloadCommentStickers]) {
         [self addHandleLongPress];
     }
 }
+%new - (BOOL)bht_isCommentSticker {
+    UIView *v = self.superview;
+    BOOL insideComment = NO;
+    while (v) {
+        NSString *className = NSStringFromClass([v class]);
+        if ([className containsString:@"CommentMedia"] || 
+            [className containsString:@"CommentSticker"] ||
+            [className containsString:@"TTKCommentMediaView"] ||
+            [className containsString:@"CommentPhoto"]) {
+            return YES;
+        }
+        if ([className containsString:@"CommentPanelCell"] || 
+            [className containsString:@"CommentCell"] || 
+            [className containsString:@"CommentMainCell"]) {
+            insideComment = YES;
+        }
+        v = v.superview;
+    }
+    if (insideComment) {
+        UIView *p = self.superview;
+        while (p) {
+            NSString *pName = NSStringFromClass([p class]);
+            if ([pName containsString:@"Avatar"] || [pName containsString:@"avatar"]) {
+                return NO;
+            }
+            p = p.superview;
+        }
+        return YES;
+    }
+    return NO;
+}
 %new - (void)addHandleLongPress {
+    for (UIGestureRecognizer *gr in self.gestureRecognizers) {
+        if ([gr isKindOfClass:[UILongPressGestureRecognizer class]] && gr.view == self) {
+            return;
+        }
+    }
     UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPress:)];
     longPress.minimumPressDuration = 0.3;
     [self addGestureRecognizer:longPress];
 }
 %new - (void)handleLongPress:(UILongPressGestureRecognizer *)sender {
     if (sender.state == UIGestureRecognizerStateBegan) {
-        NSString *title = [BHIManager localizedString:@"Save profile image" tr:@"Profil resmini kaydet"];
-        NSString *desc = [BHIManager localizedString:@"Do you want to save this image" tr:@"Bu resmi kaydetmek istiyor musunuz?"];
-        NSString *yes = [BHIManager localizedString:@"Yes" tr:@"Evet"];
-        NSString *no = [BHIManager localizedString:@"No" tr:@"Hayır"];
-        [%c(AWEUIAlertView) showAlertWithTitle:title description:desc image:nil actionButtonTitle:yes cancelButtonTitle:no actionBlock:^{
-            UIImageWriteToSavedPhotosAlbum([self bd_baseImage], self, @selector(image:didFinishSavingWithError:contextInfo:), nil);
-  } cancelBlock:nil];
+        BOOL isSticker = [self bht_isCommentSticker];
+        if (isSticker) {
+            if (![BHIManager downloadCommentStickers]) return;
+            NSString *title = [BHIManager localizedString:@"Save sticker" tr:@"Çıkartmayı kaydet"];
+            NSString *desc = [BHIManager localizedString:@"Do you want to save this sticker?" tr:@"Bu çıkartmayı kaydetmek istiyor musunuz?"];
+            NSString *yes = [BHIManager localizedString:@"Yes" tr:@"Evet"];
+            NSString *no = [BHIManager localizedString:@"No" tr:@"Hayır"];
+            [%c(AWEUIAlertView) showAlertWithTitle:title description:desc image:nil actionButtonTitle:yes cancelButtonTitle:no actionBlock:^{
+                id baseImg = [self respondsToSelector:@selector(bd_baseImage)] ? [self bd_baseImage] : self.image;
+                if (!baseImg) baseImg = self.image;
+                if ([baseImg isKindOfClass:[UIImage class]]) {
+                    UIImageWriteToSavedPhotosAlbum((UIImage *)baseImg, self, @selector(image:didFinishSavingWithError:contextInfo:), nil);
+                }
+            } cancelBlock:nil];
+        } else {
+            if (![BHIManager profileSave]) return;
+            NSString *title = [BHIManager localizedString:@"Save profile image" tr:@"Profil resmini kaydet"];
+            NSString *desc = [BHIManager localizedString:@"Do you want to save this image" tr:@"Bu resmi kaydetmek istiyor musunuz?"];
+            NSString *yes = [BHIManager localizedString:@"Yes" tr:@"Evet"];
+            NSString *no = [BHIManager localizedString:@"No" tr:@"Hayır"];
+            [%c(AWEUIAlertView) showAlertWithTitle:title description:desc image:nil actionButtonTitle:yes cancelButtonTitle:no actionBlock:^{
+                id baseImg = [self respondsToSelector:@selector(bd_baseImage)] ? [self bd_baseImage] : self.image;
+                if (!baseImg) baseImg = self.image;
+                if ([baseImg isKindOfClass:[UIImage class]]) {
+                    UIImageWriteToSavedPhotosAlbum((UIImage *)baseImg, self, @selector(image:didFinishSavingWithError:contextInfo:), nil);
+                }
+            } cancelBlock:nil];
+        }
     }
 }
 %new - (void)image:(UIImage *)image didFinishSavingWithError:(NSError *)error contextInfo:(void *)contextInfo {
-    if (error) {
-        NSLog(@"Error saving image: %@", error.localizedDescription);
-    } else {
-        NSLog(@"Image successfully saved to Photos app");
-    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        Class toastCls = NSClassFromString(@"AWEToast");
+        BOOL isSticker = [self bht_isCommentSticker];
+        if (error) {
+            NSLog(@"Error saving image: %@", error.localizedDescription);
+            if ([toastCls respondsToSelector:@selector(showError:)]) {
+                NSString *msg = isSticker ? 
+                    ([BHIManager isTurkish] ? @"Çıkartma Kaydedilemedi" : @"Failed to Save Sticker") :
+                    ([BHIManager isTurkish] ? @"Profil Resmi Kaydedilemedi" : @"Failed to Save Profile Image");
+                [toastCls showError:msg];
+            }
+        } else {
+            NSLog(@"Image successfully saved to Photos app");
+            if ([toastCls respondsToSelector:@selector(showSuccess:)]) {
+                NSString *msg = isSticker ? 
+                    ([BHIManager isTurkish] ? @"Çıkartma Fotoğraflara Kaydedildi" : @"Sticker Saved to Photos") :
+                    ([BHIManager isTurkish] ? @"Profil Resmi Kaydedildi" : @"Profile Image Saved");
+                [toastCls showSuccess:msg];
+            }
+        }
+    });
 }
 %end
 
@@ -6005,6 +6082,260 @@ static void autoTranslateCommentCell(id cell, id comment) {
 - (void)configWithComment:(id)comment {
     %orig;
     autoTranslateCommentCell(self, comment);
+}
+%end
+
+static BDImageView *bht_findStickerImageViewInView(UIView *view) {
+    if (!view) return nil;
+    NSMutableArray *queue = [NSMutableArray arrayWithObject:view];
+    while (queue.count > 0) {
+        UIView *v = queue.firstObject;
+        [queue removeObjectAtIndex:0];
+        NSString *className = NSStringFromClass([v class]);
+        if ([className containsString:@"CommentMedia"] || 
+            [className containsString:@"CommentSticker"] ||
+            [className containsString:@"TTKCommentMediaView"] ||
+            [className containsString:@"CommentPhoto"]) {
+            NSMutableArray *mediaQueue = [NSMutableArray arrayWithObject:v];
+            while (mediaQueue.count > 0) {
+                UIView *mv = mediaQueue.firstObject;
+                [mediaQueue removeObjectAtIndex:0];
+                if ([mv isKindOfClass:NSClassFromString(@"BDImageView")]) {
+                    return (BDImageView *)mv;
+                }
+                for (UIView *sub in mv.subviews) {
+                    [mediaQueue addObject:sub];
+                }
+            }
+        }
+        for (UIView *sub in v.subviews) {
+            [queue addObject:sub];
+        }
+    }
+    return nil;
+}
+
+static UIView *bht_findCellForComment(id targetComment) {
+    if (!targetComment) return nil;
+    NSString *targetCID = nil;
+    if ([targetComment respondsToSelector:@selector(commentID)]) {
+        #pragma clang diagnostic push
+        #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+        targetCID = [targetComment performSelector:@selector(commentID)];
+        #pragma clang diagnostic pop
+    } else if ([targetComment respondsToSelector:@selector(cid)]) {
+        #pragma clang diagnostic push
+        #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+        targetCID = [targetComment performSelector:@selector(cid)];
+        #pragma clang diagnostic pop
+    }
+
+    UIWindow *window = nil;
+    if (@available(iOS 13.0, *)) {
+        for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
+            if ([scene isKindOfClass:[UIWindowScene class]] && scene.activationState == UISceneActivationStateForegroundActive) {
+                for (UIWindow *w in scene.windows) {
+                    if (w.isKeyWindow) {
+                        window = w;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    if (!window) {
+        window = [UIApplication sharedApplication].keyWindow;
+    }
+    if (!window) return nil;
+
+    NSMutableArray *queue = [NSMutableArray arrayWithObject:window];
+    while (queue.count > 0) {
+        UIView *v = queue.firstObject;
+        [queue removeObjectAtIndex:0];
+        NSString *className = NSStringFromClass([v class]);
+        if ([className containsString:@"CommentPanelCell"] || 
+            [className containsString:@"CommentPanelBaseCell"] ||
+            [className containsString:@"CommentMainCell"] ||
+            [className containsString:@"CommentCell"]) {
+            id cComment = nil;
+            if ([v respondsToSelector:@selector(comment)]) {
+                #pragma clang diagnostic push
+                #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+                cComment = [v performSelector:@selector(comment)];
+                #pragma clang diagnostic pop
+            }
+            if (cComment) {
+                if (cComment == targetComment) return v;
+                NSString *cID = nil;
+                if ([cComment respondsToSelector:@selector(commentID)]) {
+                    #pragma clang diagnostic push
+                    #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+                    cID = [cComment performSelector:@selector(commentID)];
+                    #pragma clang diagnostic pop
+                } else if ([cComment respondsToSelector:@selector(cid)]) {
+                    #pragma clang diagnostic push
+                    #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+                    cID = [cComment performSelector:@selector(cid)];
+                    #pragma clang diagnostic pop
+                }
+                if (targetCID && cID && [targetCID isEqualToString:cID]) {
+                    return v;
+                }
+            }
+        }
+        for (UIView *sub in v.subviews) {
+            [queue addObject:sub];
+        }
+    }
+    return nil;
+}
+
+static void bht_saveCommentStickerFromImageView(BDImageView *imageView) {
+    if (!imageView) return;
+    id baseImg = [imageView respondsToSelector:@selector(bd_baseImage)] ? [imageView bd_baseImage] : imageView.image;
+    if (!baseImg) baseImg = imageView.image;
+    if (!baseImg) return;
+
+    NSData *animData = [imageView respondsToSelector:@selector(bd_animatedImageData)] ? [imageView bd_animatedImageData] : nil;
+    if (animData && animData.length > 0) {
+        [PHPhotoLibrary requestAuthorization:^(PHAuthorizationStatus status) {
+            if (status == PHAuthorizationStatusAuthorized || status == PHAuthorizationStatusLimited) {
+                [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
+                    PHAssetCreationRequest *req = [PHAssetCreationRequest creationRequestForAsset];
+                    [req addResourceWithType:PHAssetResourceTypePhoto data:animData options:nil];
+                } completionHandler:^(BOOL success, NSError * _Nullable error) {
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        Class toastCls = NSClassFromString(@"AWEToast");
+                        if (success && [toastCls respondsToSelector:@selector(showSuccess:)]) {
+                            [toastCls showSuccess:[BHIManager isTurkish] ? @"Çıkartma Fotoğraflara Kaydedildi" : @"Sticker Saved to Photos"];
+                        } else if (!success && [toastCls respondsToSelector:@selector(showError:)]) {
+                            [toastCls showError:[BHIManager isTurkish] ? @"Çıkartma Kaydedilemedi" : @"Failed to Save Sticker"];
+                        }
+                    });
+                }];
+            } else {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    UIImageWriteToSavedPhotosAlbum((UIImage *)baseImg, nil, nil, nil);
+                    Class toastCls = NSClassFromString(@"AWEToast");
+                    if ([toastCls respondsToSelector:@selector(showSuccess:)]) {
+                        [toastCls showSuccess:[BHIManager isTurkish] ? @"Çıkartma Fotoğraflara Kaydedildi" : @"Sticker Saved to Photos"];
+                    }
+                });
+            }
+        }];
+    } else {
+        UIImageWriteToSavedPhotosAlbum((UIImage *)baseImg, nil, nil, nil);
+        dispatch_async(dispatch_get_main_queue(), ^{
+            Class toastCls = NSClassFromString(@"AWEToast");
+            if ([toastCls respondsToSelector:@selector(showSuccess:)]) {
+                [toastCls showSuccess:[BHIManager isTurkish] ? @"Çıkartma Fotoğraflara Kaydedildi" : @"Sticker Saved to Photos"];
+            }
+        });
+    }
+}
+
+%hook TTKCommentListRowActionHandler
+- (void)showActionSheetController:(TUXActionSheetController *)controller {
+    if ([BHIManager downloadCommentStickers] && controller) {
+        BOOL hasSticker = NO;
+        for (id act in [controller actions]) {
+            if ([act respondsToSelector:@selector(title)]) {
+                NSString *actTitle = [act title];
+                if ([actTitle containsString:@"Çıkartma"] || 
+                    [actTitle containsString:@"çıkartma"] || 
+                    [actTitle containsString:@"Sticker"] || 
+                    [actTitle containsString:@"sticker"]) {
+                    hasSticker = YES;
+                    break;
+                }
+            }
+        }
+
+        id comment = nil;
+        if ([self respondsToSelector:@selector(selectedComment)]) {
+            comment = [self selectedComment];
+        }
+        if (!comment && [self respondsToSelector:@selector(context)]) {
+            id ctx = [self context];
+            if ([ctx respondsToSelector:@selector(comment)]) comment = [ctx comment];
+            else if ([ctx respondsToSelector:@selector(commentModel)]) comment = [ctx commentModel];
+        }
+
+        UIView *cell = nil;
+        if ([self respondsToSelector:@selector(context)]) {
+            id ctx = [self context];
+            if ([ctx respondsToSelector:@selector(cell)]) {
+                cell = [ctx cell];
+            }
+        }
+        if (!cell && comment) {
+            cell = bht_findCellForComment(comment);
+        }
+
+        BDImageView *stickerView = bht_findStickerImageViewInView(cell);
+        if (stickerView) {
+            hasSticker = YES;
+        }
+
+        if (hasSticker) {
+            BOOL alreadyHasDownload = NO;
+            for (id act in [controller actions]) {
+                if ([act respondsToSelector:@selector(title)]) {
+                    NSString *t = [act title];
+                    if ([t isEqualToString:@"İndir"] || [t isEqualToString:@"Download"]) {
+                        alreadyHasDownload = YES;
+                        break;
+                    }
+                }
+            }
+
+            if (!alreadyHasDownload) {
+                NSString *title = [BHIManager isTurkish] ? @"İndir" : @"Download";
+                UIImage *iconImg = nil;
+                if (@available(iOS 13.0, *)) {
+                    iconImg = [UIImage systemImageNamed:@"arrow.down.to.line"];
+                    if (!iconImg) {
+                        iconImg = [UIImage systemImageNamed:@"square.and.arrow.down"];
+                    }
+                }
+                if (!iconImg) {
+                    iconImg = [UIImage imageNamed:@"icon_download"];
+                }
+
+                void (^downloadHandler)(TUXActionSheetAction *) = ^(TUXActionSheetAction *act) {
+                    BDImageView *targetView = stickerView;
+                    if (!targetView) {
+                        UIView *c = cell ?: bht_findCellForComment(comment);
+                        targetView = bht_findStickerImageViewInView(c);
+                    }
+                    if (!targetView) {
+                        UIWindow *w = [UIApplication sharedApplication].keyWindow;
+                        targetView = bht_findStickerImageViewInView(w);
+                    }
+                    if (targetView) {
+                        bht_saveCommentStickerFromImageView(targetView);
+                    }
+                };
+
+                TUXActionSheetAction *downloadAction = nil;
+                Class actionCls = NSClassFromString(@"TUXActionSheetAction");
+                if ([actionCls respondsToSelector:@selector(actionWithStyle:title:subtitle:image:imageLabel:handler:)]) {
+                    downloadAction = [actionCls actionWithStyle:0 title:title subtitle:nil image:iconImg imageLabel:nil handler:downloadHandler];
+                } else if ([actionCls respondsToSelector:@selector(actionWithStyle:title:subtitle:image:handler:)]) {
+                    downloadAction = [actionCls actionWithStyle:0 title:title subtitle:nil image:iconImg handler:downloadHandler];
+                } else if ([actionCls respondsToSelector:@selector(actionWithStyle:title:handler:)]) {
+                    downloadAction = [actionCls actionWithStyle:0 title:title handler:downloadHandler];
+                } else {
+                    downloadAction = [[actionCls alloc] initWithStyle:0 title:title subtitle:nil image:iconImg imageLabel:nil handler:downloadHandler];
+                }
+
+                if (downloadAction) {
+                    [controller addAction:downloadAction];
+                }
+            }
+        }
+    }
+    %orig;
 }
 %end
 

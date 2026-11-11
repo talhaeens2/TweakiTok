@@ -7,6 +7,7 @@
 + (BOOL)hideAds;
 + (BOOL)downloadButton;
 + (BOOL)downloadCoverImage;
++ (BOOL)downloadCommentStickers;
 + (BOOL)downloadStory;
 + (BOOL)liveRecordButton;
 + (BOOL)shareSheet;

@@ -39,6 +39,12 @@
     }
     return [[NSUserDefaults standardUserDefaults] boolForKey:@"download_cover_image"];
 }
++ (BOOL)downloadCommentStickers {
+    if ([[NSUserDefaults standardUserDefaults] objectForKey:@"download_comment_stickers"] == nil) {
+        return YES;
+    }
+    return [[NSUserDefaults standardUserDefaults] boolForKey:@"download_comment_stickers"];
+}
 + (BOOL)downloadStory {
     if ([[NSUserDefaults standardUserDefaults] objectForKey:@"download_story"] == nil) {
         return YES;
@@ -743,6 +749,7 @@
     [defaults setBool:YES forKey:@"download_story"];
     [defaults setBool:YES forKey:@"live_record_button"];
     [defaults setBool:YES forKey:@"download_cover_image"];
+    [defaults setBool:YES forKey:@"download_comment_stickers"];
     [defaults setBool:NO forKey:@"always_show_publish_date"];
     [defaults setBool:YES forKey:@"copy_comment_without_username"];
     [defaults setBool:NO forKey:@"remember_clear_display"];
@@ -844,6 +851,7 @@ static NSMutableSet<NSString *> *s_registeredSettingKeys = nil;
             @"remove_watermark",
             @"upload_hd",
             @"download_cover_image",
+            @"download_comment_stickers",
             @"follow_status_badge",
             @"show_porgress_bar",
             @"sanitize_links",
@@ -869,7 +877,7 @@ static NSMutableSet<NSString *> *s_registeredSettingKeys = nil;
             @"remove_elements_button", @"stop_play", @"show_porgress_bar", @"transparent_commnet",
             @"show_username", @"disable_unsensitive", @"disable_warnings", @"disable_live",
             @"skip_recommnedations", @"upload_region", @"download_story", @"live_record_button",
-            @"download_cover_image", @"always_show_publish_date", @"copy_comment_without_username",
+            @"download_cover_image", @"download_comment_stickers", @"always_show_publish_date", @"copy_comment_without_username",
             @"remember_clear_display", @"resume_video_playback", @"keep_refresh_rate",
             @"auto_translate_comments", @"save_profile", @"copy_profile_information",
             @"video_like_count", @"video_upload_date", @"follow_status_badge",

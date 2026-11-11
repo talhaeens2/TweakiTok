@@ -155,7 +155,7 @@
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     switch (section) {
-        case 0: return 22;
+        case 0: return 23;
         case 1: return 5;
         case 2: return 4;
         case 3: return 10;
@@ -265,6 +265,10 @@
                 return [self createSwitchCellWithTitle:tr ? @"Yorumları Otomatik Çevir" : @"Auto Translate Comments"
                                                 Detail:tr ? @"Yorumlar açıldığı anda TikTok dil ayarlarınıza göre otomatik olarak çevrilir" : @"Automatically translate comments on load into your preferred language"
                                                    Key:@"auto_translate_comments"];
+            case 22:
+                return [self createSwitchCellWithTitle:tr ? @"Yorum Çıkartmalarını İndir" : @"Download Comment Stickers"
+                                                Detail:tr ? @"Yorumlardaki çıkartmalara basılı tutarak veya yorum menüsünden galeriye fotoğraf olarak indirmeyi sağlar" : @"Allows downloading comment stickers to the Photos app via long press or the comment menu"
+                                                   Key:@"download_comment_stickers"];
             default:
                 break;
         }
@@ -987,7 +991,7 @@
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     if ([defaults objectForKey:key] != nil) {
         switchView.on = [defaults boolForKey:key];
-    } else if ([key isEqualToString:@"hide_ads"] || [key isEqualToString:@"download_button"] || [key isEqualToString:@"download_story"] || [key isEqualToString:@"live_record_button"] || [key isEqualToString:@"remove_watermark"] || [key isEqualToString:@"upload_hd"] || [key isEqualToString:@"download_cover_image"] || [key isEqualToString:@"follow_status_badge"] || [key isEqualToString:@"show_porgress_bar"] || [key isEqualToString:@"sanitize_links"] || [key isEqualToString:@"disable_screenshot_detection"] || [key isEqualToString:@"remove_elements_button"] || [key isEqualToString:@"copy_comment_without_username"] || [key isEqualToString:@"auto_translate_comments"]) {
+    } else if ([key isEqualToString:@"hide_ads"] || [key isEqualToString:@"download_button"] || [key isEqualToString:@"download_story"] || [key isEqualToString:@"live_record_button"] || [key isEqualToString:@"remove_watermark"] || [key isEqualToString:@"upload_hd"] || [key isEqualToString:@"download_cover_image"] || [key isEqualToString:@"follow_status_badge"] || [key isEqualToString:@"show_porgress_bar"] || [key isEqualToString:@"sanitize_links"] || [key isEqualToString:@"disable_screenshot_detection"] || [key isEqualToString:@"remove_elements_button"] || [key isEqualToString:@"copy_comment_without_username"] || [key isEqualToString:@"auto_translate_comments"] || [key isEqualToString:@"download_comment_stickers"]) {
         switchView.on = YES;
     } else {
         switchView.on = NO;
