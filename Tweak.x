@@ -868,11 +868,18 @@ static BOOL isAuthenticationShowed = FALSE;
 %end
 
 
+static __weak BDImageView *sLastActiveStickerView = nil;
+
 %hook BDImageView
 - (void)layoutSubviews {
     %orig;
-    if ([BHIManager profileSave] || [BHIManager downloadCommentStickers]) {
-        [self addHandleLongPress];
+    if ([self bht_isCommentSticker]) {
+        sLastActiveStickerView = self;
+    }
+    if ([BHIManager profileSave]) {
+        if (![self bht_isCommentSticker]) {
+            [self addHandleLongPress];
+        }
     }
 }
 %new - (BOOL)bht_isCommentSticker {
@@ -918,55 +925,32 @@ static BOOL isAuthenticationShowed = FALSE;
 }
 %new - (void)handleLongPress:(UILongPressGestureRecognizer *)sender {
     if (sender.state == UIGestureRecognizerStateBegan) {
-        BOOL isSticker = [self bht_isCommentSticker];
-        if (isSticker) {
-            if (![BHIManager downloadCommentStickers]) return;
-            NSString *title = [BHIManager localizedString:@"Save sticker" tr:@"Çıkartmayı kaydet"];
-            NSString *desc = [BHIManager localizedString:@"Do you want to save this sticker?" tr:@"Bu çıkartmayı kaydetmek istiyor musunuz?"];
-            NSString *yes = [BHIManager localizedString:@"Yes" tr:@"Evet"];
-            NSString *no = [BHIManager localizedString:@"No" tr:@"Hayır"];
-            [%c(AWEUIAlertView) showAlertWithTitle:title description:desc image:nil actionButtonTitle:yes cancelButtonTitle:no actionBlock:^{
-                id baseImg = [self respondsToSelector:@selector(bd_baseImage)] ? [self bd_baseImage] : self.image;
-                if (!baseImg) baseImg = self.image;
-                if ([baseImg isKindOfClass:[UIImage class]]) {
-                    UIImageWriteToSavedPhotosAlbum((UIImage *)baseImg, self, @selector(image:didFinishSavingWithError:contextInfo:), nil);
-                }
-            } cancelBlock:nil];
-        } else {
-            if (![BHIManager profileSave]) return;
-            NSString *title = [BHIManager localizedString:@"Save profile image" tr:@"Profil resmini kaydet"];
-            NSString *desc = [BHIManager localizedString:@"Do you want to save this image" tr:@"Bu resmi kaydetmek istiyor musunuz?"];
-            NSString *yes = [BHIManager localizedString:@"Yes" tr:@"Evet"];
-            NSString *no = [BHIManager localizedString:@"No" tr:@"Hayır"];
-            [%c(AWEUIAlertView) showAlertWithTitle:title description:desc image:nil actionButtonTitle:yes cancelButtonTitle:no actionBlock:^{
-                id baseImg = [self respondsToSelector:@selector(bd_baseImage)] ? [self bd_baseImage] : self.image;
-                if (!baseImg) baseImg = self.image;
-                if ([baseImg isKindOfClass:[UIImage class]]) {
-                    UIImageWriteToSavedPhotosAlbum((UIImage *)baseImg, self, @selector(image:didFinishSavingWithError:contextInfo:), nil);
-                }
-            } cancelBlock:nil];
-        }
+        if (![BHIManager profileSave]) return;
+        NSString *title = [BHIManager localizedString:@"Save profile image" tr:@"Profil resmini kaydet"];
+        NSString *desc = [BHIManager localizedString:@"Do you want to save this image" tr:@"Bu resmi kaydetmek istiyor musunuz?"];
+        NSString *yes = [BHIManager localizedString:@"Yes" tr:@"Evet"];
+        NSString *no = [BHIManager localizedString:@"No" tr:@"Hayır"];
+        [%c(AWEUIAlertView) showAlertWithTitle:title description:desc image:nil actionButtonTitle:yes cancelButtonTitle:no actionBlock:^{
+            id baseImg = [self respondsToSelector:@selector(bd_baseImage)] ? [self bd_baseImage] : self.image;
+            if (!baseImg) baseImg = self.image;
+            if ([baseImg isKindOfClass:[UIImage class]]) {
+                UIImageWriteToSavedPhotosAlbum((UIImage *)baseImg, self, @selector(image:didFinishSavingWithError:contextInfo:), nil);
+            }
+        } cancelBlock:nil];
     }
 }
 %new - (void)image:(UIImage *)image didFinishSavingWithError:(NSError *)error contextInfo:(void *)contextInfo {
     dispatch_async(dispatch_get_main_queue(), ^{
         Class toastCls = NSClassFromString(@"AWEToast");
-        BOOL isSticker = [self bht_isCommentSticker];
         if (error) {
             NSLog(@"Error saving image: %@", error.localizedDescription);
             if ([toastCls respondsToSelector:@selector(showError:)]) {
-                NSString *msg = isSticker ? 
-                    ([BHIManager isTurkish] ? @"Çıkartma Kaydedilemedi" : @"Failed to Save Sticker") :
-                    ([BHIManager isTurkish] ? @"Profil Resmi Kaydedilemedi" : @"Failed to Save Profile Image");
-                [toastCls showError:msg];
+                [toastCls showError:[BHIManager isTurkish] ? @"Profil Resmi Kaydedilemedi" : @"Failed to Save Profile Image"];
             }
         } else {
             NSLog(@"Image successfully saved to Photos app");
             if ([toastCls respondsToSelector:@selector(showSuccess:)]) {
-                NSString *msg = isSticker ? 
-                    ([BHIManager isTurkish] ? @"Çıkartma Fotoğraflara Kaydedildi" : @"Sticker Saved to Photos") :
-                    ([BHIManager isTurkish] ? @"Profil Resmi Kaydedildi" : @"Profile Image Saved");
-                [toastCls showSuccess:msg];
+                [toastCls showSuccess:[BHIManager isTurkish] ? @"Profil Resmi Kaydedildi" : @"Profile Image Saved"];
             }
         }
     });
@@ -6233,6 +6217,183 @@ static void bht_saveCommentStickerFromImageView(BDImageView *imageView) {
         });
     }
 }
+
+%hook _TtC17TikTokCommentImpl19TTKCommentMediaView
+- (void)layoutSubviews {
+    %orig;
+    BDImageView *iv = bht_findStickerImageViewInView(self);
+    if (iv) {
+        sLastActiveStickerView = iv;
+    }
+}
+%end
+
+%hook _TtC17TikTokCommentImpl37TTKCommentSimplifiedLongPressMenuView
+- (void)layoutSubviews {
+    %orig;
+    if (![BHIManager downloadCommentStickers]) return;
+    if ([self viewWithTag:88991]) return;
+    
+    UIView *firstRow = nil;
+    CGFloat rowH = 40.0;
+    for (UIView *sub in self.subviews) {
+        if (sub.tag == 88991 || sub.tag == 88992) continue;
+        if (sub.frame.size.height > 20 && sub.frame.size.width > 40) {
+            firstRow = sub;
+            rowH = sub.frame.size.height;
+            break;
+        }
+    }
+    
+    CGFloat menuW = self.bounds.size.width > 0 ? self.bounds.size.width : 160.0;
+    CGFloat btnY = firstRow ? CGRectGetMaxY(firstRow.frame) : rowH;
+    
+    CGRect superF = self.frame;
+    superF.size.height = btnY + rowH + 6.0;
+    self.frame = superF;
+    
+    UIView *sep = [[UIView alloc] initWithFrame:CGRectMake(12, btnY, menuW - 24, 0.5)];
+    sep.tag = 88992;
+    sep.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.15];
+    sep.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+    [self addSubview:sep];
+    
+    UIButton *dlBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    dlBtn.tag = 88991;
+    dlBtn.frame = CGRectMake(0, btnY + 1.0, menuW, rowH);
+    dlBtn.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+    [dlBtn setTitle:[BHIManager isTurkish] ? @"İndir" : @"Download" forState:UIControlStateNormal];
+    [dlBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    dlBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    
+    UIImage *icon = nil;
+    if (@available(iOS 13.0, *)) {
+        icon = [UIImage systemImageNamed:@"arrow.down.to.line"];
+        if (!icon) icon = [UIImage systemImageNamed:@"square.and.arrow.down"];
+        if (icon) {
+            UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:15 weight:UIImageSymbolWeightMedium];
+            icon = [icon imageWithConfiguration:cfg];
+        }
+    }
+    if (icon) {
+        [dlBtn setImage:icon forState:UIControlStateNormal];
+        dlBtn.tintColor = [UIColor whiteColor];
+        dlBtn.imageEdgeInsets = UIEdgeInsetsMake(0, -6, 0, 6);
+    }
+    dlBtn.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
+    dlBtn.contentEdgeInsets = UIEdgeInsetsMake(0, 16, 0, 16);
+    [dlBtn addTarget:self action:@selector(bht_downloadStickerAction) forControlEvents:UIControlEventTouchUpInside];
+    [self addSubview:dlBtn];
+}
+
+%new - (void)bht_downloadStickerAction {
+    BDImageView *targetView = sLastActiveStickerView;
+    if (!targetView) {
+        UIWindow *w = self.window ?: [UIApplication sharedApplication].keyWindow;
+        targetView = bht_findStickerImageViewInView(w);
+    }
+    if (targetView) {
+        bht_saveCommentStickerFromImageView(targetView);
+    }
+    
+    UIResponder *r = self.nextResponder;
+    while (r && ![r isKindOfClass:[UIViewController class]]) {
+        r = r.nextResponder;
+    }
+    if ([r isKindOfClass:[UIViewController class]]) {
+        [(UIViewController *)r dismissViewControllerAnimated:YES completion:nil];
+    } else {
+        [self removeFromSuperview];
+    }
+}
+%end
+
+%hook _TtC17TikTokCommentImpl31CommentLongPressPanelActionCell
+- (void)layoutSubviews {
+    %orig;
+    if (![BHIManager downloadCommentStickers]) return;
+    
+    BOOL isStickerCell = NO;
+    NSMutableArray *q = [NSMutableArray arrayWithObject:self];
+    while (q.count > 0) {
+        UIView *v = q.firstObject;
+        [q removeObjectAtIndex:0];
+        if ([v isKindOfClass:[UILabel class]]) {
+            UILabel *l = (UILabel *)v;
+            if (l.text && ([l.text containsString:@"Çıkartma"] || 
+                           [l.text containsString:@"çıkartma"] || 
+                           [l.text containsString:@"Sticker"] || 
+                           [l.text containsString:@"sticker"])) {
+                isStickerCell = YES;
+                break;
+            }
+        }
+        for (UIView *sub in v.subviews) {
+            [q addObject:sub];
+        }
+    }
+    
+    if (isStickerCell) {
+        if (![self viewWithTag:88993]) {
+            CGFloat cellW = self.bounds.size.width;
+            CGFloat cellH = self.bounds.size.height;
+            CGFloat btnW = 88.0;
+            CGFloat btnH = 32.0;
+            CGFloat btnX = cellW - btnW - 16.0;
+            CGFloat btnY = (cellH - btnH) / 2.0;
+            
+            UIButton *dlBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+            dlBtn.tag = 88993;
+            dlBtn.frame = CGRectMake(btnX, btnY, btnW, btnH);
+            dlBtn.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleBottomMargin;
+            dlBtn.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.14];
+            dlBtn.layer.cornerRadius = 16.0;
+            dlBtn.layer.masksToBounds = YES;
+            
+            [dlBtn setTitle:[BHIManager isTurkish] ? @" İndir" : @" Save" forState:UIControlStateNormal];
+            [dlBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+            dlBtn.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+            
+            UIImage *icon = nil;
+            if (@available(iOS 13.0, *)) {
+                icon = [UIImage systemImageNamed:@"arrow.down.to.line"];
+                if (!icon) icon = [UIImage systemImageNamed:@"square.and.arrow.down"];
+                if (icon) {
+                    UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:13 weight:UIImageSymbolWeightMedium];
+                    icon = [icon imageWithConfiguration:cfg];
+                }
+            }
+            if (icon) {
+                [dlBtn setImage:icon forState:UIControlStateNormal];
+                dlBtn.tintColor = [UIColor whiteColor];
+            }
+            
+            [dlBtn addTarget:self action:@selector(bht_onPanelDownloadTapped) forControlEvents:UIControlEventTouchUpInside];
+            [self addSubview:dlBtn];
+            [self bringSubviewToFront:dlBtn];
+        }
+    }
+}
+
+%new - (void)bht_onPanelDownloadTapped {
+    BDImageView *targetView = sLastActiveStickerView;
+    if (!targetView) {
+        UIWindow *w = self.window ?: [UIApplication sharedApplication].keyWindow;
+        targetView = bht_findStickerImageViewInView(w);
+    }
+    if (targetView) {
+        bht_saveCommentStickerFromImageView(targetView);
+    }
+    
+    UIResponder *r = self.nextResponder;
+    while (r && ![r isKindOfClass:[UIViewController class]]) {
+        r = r.nextResponder;
+    }
+    if ([r isKindOfClass:[UIViewController class]]) {
+        [(UIViewController *)r dismissViewControllerAnimated:YES completion:nil];
+    }
+}
+%end
 
 %hook TTKCommentListRowActionHandler
 - (void)showActionSheetController:(TUXActionSheetController *)controller {

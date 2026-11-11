@@ -734,6 +734,17 @@
 - (void)applyClearDisplayMode:(BOOL)clear;
 @end
 
+@interface _TtC17TikTokCommentImpl37TTKCommentSimplifiedLongPressMenuView : UIView
+- (void)bht_downloadStickerAction;
+@end
+
+@interface _TtC17TikTokCommentImpl31CommentLongPressPanelActionCell : UIView
+- (void)bht_onPanelDownloadTapped;
+@end
+
+@interface _TtC17TikTokCommentImpl19TTKCommentMediaView : UIView
+@end
+
 static BOOL is_iPad() {
     if ([(NSString *)[UIDevice currentDevice].model hasPrefix:@"iPad"]) {
         return YES;
