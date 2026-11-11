@@ -60,6 +60,7 @@
 + (BOOL)ghostTyping;
 + (BOOL)sanitizeLinks;
 + (BOOL)showRegionChangeOption;
++ (BOOL)developerMode;
 + (NSNumber *)offlineVideosLimit;
 + (NSDictionary *)abOverrides;
 + (void)showSaveVC:(id)item;

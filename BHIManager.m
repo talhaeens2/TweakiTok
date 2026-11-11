@@ -238,6 +238,12 @@
     }
     return [[NSUserDefaults standardUserDefaults] boolForKey:@"sanitize_links"];
 }
++ (BOOL)developerMode {
+    if ([[NSUserDefaults standardUserDefaults] objectForKey:@"developer_mode"] == nil) {
+        return NO;
+    }
+    return [[NSUserDefaults standardUserDefaults] boolForKey:@"developer_mode"];
+}
 + (BOOL)showRegionChangeOption {
     return [[NSUserDefaults standardUserDefaults] boolForKey:@"show_region_change_option"];
 }
@@ -796,6 +802,7 @@
     [defaults removeObjectForKey:@"offline_videos_limit"];
     [defaults removeObjectForKey:@"ab_overrides"];
     [defaults removeObjectForKey:@"tweakiktok_language_manually_set"];
+    [defaults setBool:NO forKey:@"developer_mode"];
     
     // Language Defaults
     [defaults removeObjectForKey:@"tweakiktok_language"];
@@ -886,7 +893,7 @@ static NSMutableSet<NSString *> *s_registeredSettingKeys = nil;
             @"extendedComment", @"app_lock", @"fake_changes", @"fake_verified",
             @"flex_en", @"en_region", @"show_region_change", @"en_livefunc",
             @"playback_en", @"ghost_read_receipts", @"ghost_typing", @"sanitize_links",
-            @"disable_screenshot_detection", @"disable_telemetry",
+            @"disable_screenshot_detection", @"disable_telemetry", @"developer_mode",
             @"following_count", @"follower_count", @"region", @"live_action",
             @"playback_speed", @"offline_videos_limit", @"ab_overrides",
             @"tweakiktok_language", @"tweakiktok_language_manually_set"

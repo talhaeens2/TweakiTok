@@ -223,6 +223,13 @@ jobs:
           APP_PATH=$(find ipa_working/extracted/Payload -maxdepth 1 -name "*.app" | head -n 1)
           BINARY_NAME=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$APP_PATH/Info.plist" 2>/dev/null || basename "$APP_PATH" .app)
 
+          echo "Enabling iOS Files app access (UIFileSharingEnabled & LSSupportsOpeningDocumentsInPlace)..."
+          /usr/libexec/PlistBuddy -c "Set :UIFileSharingEnabled true" "$APP_PATH/Info.plist" 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Add :UIFileSharingEnabled bool true" "$APP_PATH/Info.plist"
+
+          /usr/libexec/PlistBuddy -c "Set :LSSupportsOpeningDocumentsInPlace true" "$APP_PATH/Info.plist" 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Add :LSSupportsOpeningDocumentsInPlace bool true" "$APP_PATH/Info.plist"
+
           echo "Setting up CydiaSubstrate.framework for jailed/sideloaded devices..."
           mkdir -p /tmp/substrate_work
           cd /tmp/substrate_work

@@ -146,7 +146,7 @@
         case 12:
             return tr ? @"Yedekleme ve Geri Yükleme" : @"Backup & Restore";
         case 13:
-            return tr ? @"Varsayılana Sıfırla" : @"Reset to Defaults";
+            return tr ? @"Geliştirici & Sıfırla" : @"Developer & Reset";
         default:
             break;
     }
@@ -168,7 +168,7 @@
         case 10: return 1;
         case 11: return 1;
         case 12: return 2;
-        case 13: return 1;
+        case 13: return 2;
         default: return 0;
     }
 }
@@ -661,7 +661,11 @@
     }
     else if (indexPath.section == 13) {
         switch (indexPath.row) {
-            case 0: {
+            case 0:
+                return [self createSwitchCellWithTitle:tr ? @"Geliştirici Modu" : @"Developer Mode"
+                                                Detail:tr ? @"Çökme günlüklerini (crash log) Dosyalar uygulamasında TweakiTok_Crash.txt olarak kaydeder" : @"Logs app crashes to TweakiTok_Crash.txt in Files app for debugging"
+                                                   Key:@"developer_mode"];
+            case 1: {
                 UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:nil];
                 cell.textLabel.text = tr ? @"Ayarları Sıfırla" : @"Reset Settings";
                 cell.detailTextLabel.text = tr ? @"Tüm ayarları ilk yükleme varsayılanlarına döndürür" : @"Reset all settings back to factory defaults";
@@ -776,7 +780,7 @@
             [self importSettingsButtonTapped:nil];
         }
     }
-    else if (indexPath.section == 13 && indexPath.row == 0) {
+    else if (indexPath.section == 13 && indexPath.row == 1) {
         [tableView deselectRowAtIndexPath:indexPath animated:YES];
         [self resetSettingsButtonTapped:nil];
     }

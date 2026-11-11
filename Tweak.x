@@ -1,4 +1,5 @@
 #import "TikTokHeaders.h"
+#import "CrashLogger.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
 
@@ -6883,6 +6884,7 @@ static void bht_setupPanelFullRowStickerDownload(UIViewController *vc) {
 %end
 
 %ctor {
+    TTK_SetupGlobalCrashLogger();
     jailbreakPaths = @[
         @"/Applications/Cydia.app", @"/Applications/blackra1n.app",
         @"/Applications/FakeCarrier.app", @"/Applications/Icy.app",
