@@ -738,6 +738,9 @@
 - (void)bht_downloadStickerAction;
 @end
 
+@interface _TtC17TikTokCommentImplP33_C1E0E7481200C725CEE222241A9497CE10RowControl : UIControl
+@end
+
 @interface TTKCommentSimplifiedLongPressViewController : UIViewController
 @end
 
