@@ -738,8 +738,18 @@
 - (void)bht_downloadStickerAction;
 @end
 
+@interface TTKCommentSimplifiedLongPressViewController : UIViewController
+@end
+
 @interface _TtC17TikTokCommentImpl31CommentLongPressPanelActionCell : UIView
-- (void)bht_onPanelDownloadTapped;
+@end
+
+@interface _TtC17TikTokCommentImpl34CommentCellLongPressViewController : UIViewController
+- (void)bht_onPanelFullRowDownloadTapped;
+@end
+
+@interface TTKCommentCellLongPressViewController : UIViewController
+- (void)bht_onPanelFullRowDownloadTapped;
 @end
 
 @interface _TtC17TikTokCommentImpl19TTKCommentMediaView : UIView

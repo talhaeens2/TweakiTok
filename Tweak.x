@@ -6229,61 +6229,97 @@ static void bht_saveCommentStickerFromImageView(BDImageView *imageView) {
 %end
 
 %hook _TtC17TikTokCommentImpl37TTKCommentSimplifiedLongPressMenuView
+- (CGSize)intrinsicContentSize {
+    CGSize orig = %orig;
+    if ([BHIManager downloadCommentStickers]) {
+        CGFloat rowH = orig.height > 0 ? orig.height : 40.0;
+        return CGSizeMake(orig.width, rowH * 2.0 + 4.0);
+    }
+    return orig;
+}
+
+- (CGSize)sizeThatFits:(CGSize)size {
+    CGSize orig = %orig(size);
+    if ([BHIManager downloadCommentStickers]) {
+        CGFloat rowH = orig.height > 0 ? orig.height : 40.0;
+        return CGSizeMake(orig.width, rowH * 2.0 + 4.0);
+    }
+    return orig;
+}
+
 - (void)layoutSubviews {
     %orig;
     if (![BHIManager downloadCommentStickers]) return;
-    if ([self viewWithTag:88991]) return;
+    
+    self.clipsToBounds = NO;
+    if (self.superview) {
+        self.superview.clipsToBounds = NO;
+    }
     
     UIView *firstRow = nil;
     CGFloat rowH = 40.0;
     for (UIView *sub in self.subviews) {
         if (sub.tag == 88991 || sub.tag == 88992) continue;
-        if (sub.frame.size.height > 20 && sub.frame.size.width > 40) {
+        if (sub.frame.size.height > 10 && sub.frame.size.width > 30) {
             firstRow = sub;
             rowH = sub.frame.size.height;
             break;
         }
     }
     
-    CGFloat menuW = self.bounds.size.width > 0 ? self.bounds.size.width : 160.0;
+    CGFloat menuW = self.bounds.size.width > 0 ? self.bounds.size.width : 180.0;
     CGFloat btnY = firstRow ? CGRectGetMaxY(firstRow.frame) : rowH;
     
+    // Genişletilmiş baloncuk boyu
     CGRect superF = self.frame;
-    superF.size.height = btnY + rowH + 6.0;
-    self.frame = superF;
+    CGFloat targetH = btnY + (rowH > 0 ? rowH : 40.0) + 6.0;
+    if (superF.size.height < targetH) {
+        superF.size.height = targetH;
+        self.frame = superF;
+    }
     
-    UIView *sep = [[UIView alloc] initWithFrame:CGRectMake(12, btnY, menuW - 24, 0.5)];
-    sep.tag = 88992;
-    sep.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.15];
-    sep.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-    [self addSubview:sep];
+    // Ayırıcı ince çizgi
+    UIView *sep = [self viewWithTag:88992];
+    if (!sep) {
+        sep = [[UIView alloc] initWithFrame:CGRectMake(12, btnY, menuW - 24, 0.5)];
+        sep.tag = 88992;
+        sep.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.18];
+        sep.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+        [self addSubview:sep];
+    } else {
+        sep.frame = CGRectMake(12, btnY, menuW - 24, 0.5);
+    }
     
-    UIButton *dlBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    dlBtn.tag = 88991;
-    dlBtn.frame = CGRectMake(0, btnY + 1.0, menuW, rowH);
-    dlBtn.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-    [dlBtn setTitle:[BHIManager isTurkish] ? @"İndir" : @"Download" forState:UIControlStateNormal];
-    [dlBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    dlBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
-    
-    UIImage *icon = nil;
-    if (@available(iOS 13.0, *)) {
-        icon = [UIImage systemImageNamed:@"arrow.down.to.line"];
-        if (!icon) icon = [UIImage systemImageNamed:@"square.and.arrow.down"];
-        if (icon) {
-            UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:15 weight:UIImageSymbolWeightMedium];
-            icon = [icon imageWithConfiguration:cfg];
+    // "Fotoğraflara kaydet" butonu
+    UIButton *dlBtn = (UIButton *)[self viewWithTag:88991];
+    if (!dlBtn) {
+        dlBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+        dlBtn.tag = 88991;
+        dlBtn.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+        [dlBtn setTitle:[BHIManager isTurkish] ? @"Fotoğraflara kaydet" : @"Save to Photos" forState:UIControlStateNormal];
+        [dlBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+        dlBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+        
+        UIImage *icon = nil;
+        if (@available(iOS 13.0, *)) {
+            icon = [UIImage systemImageNamed:@"square.and.arrow.down"];
+            if (!icon) icon = [UIImage systemImageNamed:@"arrow.down.to.line"];
+            if (icon) {
+                UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:14 weight:UIImageSymbolWeightMedium];
+                icon = [icon imageWithConfiguration:cfg];
+            }
         }
+        if (icon) {
+            [dlBtn setImage:icon forState:UIControlStateNormal];
+            dlBtn.tintColor = [UIColor whiteColor];
+            dlBtn.imageEdgeInsets = UIEdgeInsetsMake(0, -6, 0, 6);
+        }
+        dlBtn.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
+        dlBtn.contentEdgeInsets = UIEdgeInsetsMake(0, 16, 0, 16);
+        [dlBtn addTarget:self action:@selector(bht_downloadStickerAction) forControlEvents:UIControlEventTouchUpInside];
+        [self addSubview:dlBtn];
     }
-    if (icon) {
-        [dlBtn setImage:icon forState:UIControlStateNormal];
-        dlBtn.tintColor = [UIColor whiteColor];
-        dlBtn.imageEdgeInsets = UIEdgeInsetsMake(0, -6, 0, 6);
-    }
-    dlBtn.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
-    dlBtn.contentEdgeInsets = UIEdgeInsetsMake(0, 16, 0, 16);
-    [dlBtn addTarget:self action:@selector(bht_downloadStickerAction) forControlEvents:UIControlEventTouchUpInside];
-    [self addSubview:dlBtn];
+    dlBtn.frame = CGRectMake(0, btnY + 1.0, menuW, rowH > 0 ? rowH : 40.0);
 }
 
 %new - (void)bht_downloadStickerAction {
@@ -6308,24 +6344,71 @@ static void bht_saveCommentStickerFromImageView(BDImageView *imageView) {
 }
 %end
 
+%hook TTKCommentSimplifiedLongPressViewController
+- (void)viewDidLayoutSubviews {
+    %orig;
+    if ([BHIManager downloadCommentStickers]) {
+        self.view.clipsToBounds = NO;
+        for (UIView *sub in self.view.subviews) {
+            sub.clipsToBounds = NO;
+        }
+    }
+}
+%end
+
 %hook _TtC17TikTokCommentImpl31CommentLongPressPanelActionCell
 - (void)layoutSubviews {
     %orig;
-    if (![BHIManager downloadCommentStickers]) return;
+    // Sağdaki küçük butonları kaldır (kullanıcı istek: "buralardan kaldır")
+    UIView *oldBtn = [self viewWithTag:88993];
+    if (oldBtn) {
+        [oldBtn removeFromSuperview];
+    }
+}
+%end
+
+static void bht_setupPanelFullRowStickerDownload(UIViewController *vc) {
+    if (!vc || ![BHIManager downloadCommentStickers]) return;
     
-    BOOL isStickerCell = NO;
-    NSMutableArray *q = [NSMutableArray arrayWithObject:self];
+    // Sağdaki eski küçük butonları temizle
+    for (UIView *sub in vc.view.subviews) {
+        UIView *b = [sub viewWithTag:88993];
+        if (b) [b removeFromSuperview];
+    }
+    
+    // Menüde "Çıkartmayı kaydet" hücresi var mı kontrol et
+    BOOL hasStickerAction = NO;
+    UIView *lastActionCell = nil;
+    UIScrollView *containerScroll = nil;
+    
+    NSMutableArray *q = [NSMutableArray arrayWithObject:vc.view];
     while (q.count > 0) {
         UIView *v = q.firstObject;
         [q removeObjectAtIndex:0];
-        if ([v isKindOfClass:[UILabel class]]) {
-            UILabel *l = (UILabel *)v;
-            if (l.text && ([l.text containsString:@"Çıkartma"] || 
-                           [l.text containsString:@"çıkartma"] || 
-                           [l.text containsString:@"Sticker"] || 
-                           [l.text containsString:@"sticker"])) {
-                isStickerCell = YES;
-                break;
+        
+        if ([v isKindOfClass:[UIScrollView class]]) {
+            containerScroll = (UIScrollView *)v;
+        }
+        
+        NSString *clsName = NSStringFromClass([v class]);
+        if ([clsName containsString:@"CommentLongPressPanelActionCell"]) {
+            lastActionCell = v;
+            // İçindeki label'ı kontrol et
+            for (UIView *sub in v.subviews) {
+                NSMutableArray *subQ = [NSMutableArray arrayWithObject:sub];
+                while (subQ.count > 0) {
+                    UIView *sv = subQ.firstObject;
+                    [subQ removeObjectAtIndex:0];
+                    if ([sv isKindOfClass:[UILabel class]]) {
+                        UILabel *lbl = (UILabel *)sv;
+                        if (lbl.text && ([lbl.text containsString:@"Çıkartma"] || [lbl.text containsString:@"çıkartma"] || [lbl.text containsString:@"Sticker"] || [lbl.text containsString:@"sticker"])) {
+                            hasStickerAction = YES;
+                            break;
+                        }
+                    }
+                    for (UIView *ss in sv.subviews) [subQ addObject:ss];
+                }
+                if (hasStickerAction) break;
             }
         }
         for (UIView *sub in v.subviews) {
@@ -6333,65 +6416,92 @@ static void bht_saveCommentStickerFromImageView(BDImageView *imageView) {
         }
     }
     
-    if (isStickerCell) {
-        if (![self viewWithTag:88993]) {
-            CGFloat cellW = self.bounds.size.width;
-            CGFloat cellH = self.bounds.size.height;
-            CGFloat btnW = 88.0;
-            CGFloat btnH = 32.0;
-            CGFloat btnX = cellW - btnW - 16.0;
-            CGFloat btnY = (cellH - btnH) / 2.0;
-            
-            UIButton *dlBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-            dlBtn.tag = 88993;
-            dlBtn.frame = CGRectMake(btnX, btnY, btnW, btnH);
-            dlBtn.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleBottomMargin;
-            dlBtn.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.14];
-            dlBtn.layer.cornerRadius = 16.0;
-            dlBtn.layer.masksToBounds = YES;
-            
-            [dlBtn setTitle:[BHIManager isTurkish] ? @" İndir" : @" Save" forState:UIControlStateNormal];
-            [dlBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-            dlBtn.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
-            
-            UIImage *icon = nil;
-            if (@available(iOS 13.0, *)) {
-                icon = [UIImage systemImageNamed:@"arrow.down.to.line"];
-                if (!icon) icon = [UIImage systemImageNamed:@"square.and.arrow.down"];
-                if (icon) {
-                    UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:13 weight:UIImageSymbolWeightMedium];
-                    icon = [icon imageWithConfiguration:cfg];
-                }
-            }
+    if (!hasStickerAction) return;
+    
+    // "Fotoğraflara kaydet" satırını ekle (tıpkı Çıkartmayı kaydet, Çevirin gibi tam bir satır)
+    UIView *parentView = lastActionCell ? lastActionCell.superview : (containerScroll ?: vc.view);
+    if (!parentView) return;
+    
+    UIButton *rowBtn = (UIButton *)[parentView viewWithTag:88995];
+    CGFloat cellW = lastActionCell ? lastActionCell.bounds.size.width : parentView.bounds.size.width;
+    CGFloat cellH = lastActionCell ? lastActionCell.bounds.size.height : 52.0;
+    if (cellH <= 0) cellH = 52.0;
+    CGFloat rowY = lastActionCell ? CGRectGetMaxY(lastActionCell.frame) : 0;
+    
+    if (!rowBtn) {
+        rowBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+        rowBtn.tag = 88995;
+        rowBtn.backgroundColor = [UIColor clearColor];
+        [rowBtn setTitle:[BHIManager isTurkish] ? @"Fotoğraflara kaydet" : @"Save to Photos" forState:UIControlStateNormal];
+        [rowBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+        rowBtn.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightRegular];
+        
+        UIImage *icon = nil;
+        if (@available(iOS 13.0, *)) {
+            icon = [UIImage systemImageNamed:@"square.and.arrow.down"];
+            if (!icon) icon = [UIImage systemImageNamed:@"arrow.down.to.line"];
             if (icon) {
-                [dlBtn setImage:icon forState:UIControlStateNormal];
-                dlBtn.tintColor = [UIColor whiteColor];
+                UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:17 weight:UIImageSymbolWeightRegular];
+                icon = [icon imageWithConfiguration:cfg];
             }
-            
-            [dlBtn addTarget:self action:@selector(bht_onPanelDownloadTapped) forControlEvents:UIControlEventTouchUpInside];
-            [self addSubview:dlBtn];
-            [self bringSubviewToFront:dlBtn];
+        }
+        if (icon) {
+            [rowBtn setImage:icon forState:UIControlStateNormal];
+            rowBtn.tintColor = [UIColor whiteColor];
+        }
+        
+        rowBtn.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
+        rowBtn.contentEdgeInsets = UIEdgeInsetsMake(0, 16, 0, 16);
+        rowBtn.titleEdgeInsets = UIEdgeInsetsMake(0, 14, 0, -14);
+        [rowBtn addTarget:vc action:@selector(bht_onPanelFullRowDownloadTapped) forControlEvents:UIControlEventTouchUpInside];
+        [parentView addSubview:rowBtn];
+    }
+    
+    rowBtn.frame = CGRectMake(0, rowY, cellW, cellH);
+    
+    if (containerScroll) {
+        CGFloat totalH = CGRectGetMaxY(rowBtn.frame) + 16.0;
+        if (containerScroll.contentSize.height < totalH) {
+            containerScroll.contentSize = CGSizeMake(containerScroll.contentSize.width, totalH);
         }
     }
 }
 
-%new - (void)bht_onPanelDownloadTapped {
+%hook _TtC17TikTokCommentImpl34CommentCellLongPressViewController
+- (void)viewDidLayoutSubviews {
+    %orig;
+    bht_setupPanelFullRowStickerDownload(self);
+}
+
+%new - (void)bht_onPanelFullRowDownloadTapped {
     BDImageView *targetView = sLastActiveStickerView;
     if (!targetView) {
-        UIWindow *w = self.window ?: [UIApplication sharedApplication].keyWindow;
+        UIWindow *w = self.view.window ?: [UIApplication sharedApplication].keyWindow;
         targetView = bht_findStickerImageViewInView(w);
     }
     if (targetView) {
         bht_saveCommentStickerFromImageView(targetView);
     }
-    
-    UIResponder *r = self.nextResponder;
-    while (r && ![r isKindOfClass:[UIViewController class]]) {
-        r = r.nextResponder;
+    [self dismissViewControllerAnimated:YES completion:nil];
+}
+%end
+
+%hook TTKCommentCellLongPressViewController
+- (void)viewDidLayoutSubviews {
+    %orig;
+    bht_setupPanelFullRowStickerDownload(self);
+}
+
+%new - (void)bht_onPanelFullRowDownloadTapped {
+    BDImageView *targetView = sLastActiveStickerView;
+    if (!targetView) {
+        UIWindow *w = self.view.window ?: [UIApplication sharedApplication].keyWindow;
+        targetView = bht_findStickerImageViewInView(w);
     }
-    if ([r isKindOfClass:[UIViewController class]]) {
-        [(UIViewController *)r dismissViewControllerAnimated:YES completion:nil];
+    if (targetView) {
+        bht_saveCommentStickerFromImageView(targetView);
     }
+    [self dismissViewControllerAnimated:YES completion:nil];
 }
 %end
 
