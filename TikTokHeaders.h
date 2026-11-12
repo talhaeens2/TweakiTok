@@ -40,6 +40,10 @@
 - (void)image:(UIImage *)image didFinishSavingWithError:(NSError *)error contextInfo:(void *)contextInfo;
 @end
 
+@interface UIView (BHTStickerViewer)
+- (void)bht_stickerViewerDownloadTapped;
+@end
+
 @interface TTTAttributedLabel: UILabel 
 - (void)handleLongPress:(UILongPressGestureRecognizer *)sender;
 - (void)addHandleLongPress;
@@ -756,6 +760,12 @@
 @end
 
 @interface _TtC17TikTokCommentImpl19TTKCommentMediaView : UIView
+@end
+
+@interface _TtC17TikTokIMImplSwift34IMStickerDetailPanelViewController : UIViewController
+@end
+
+@interface _TtC17TikTokIMImplSwift40IMStickerDetailPanelActionViewController : UIViewController
 @end
 
 static BOOL is_iPad() {

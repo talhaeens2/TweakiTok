@@ -871,6 +871,9 @@ static BOOL isAuthenticationShowed = FALSE;
 
 static __weak BDImageView *sLastActiveStickerView = nil;
 static void bht_scheduleTooltipEnrichment(void);
+static void bht_injectDownloadIconIntoStickerViewer(UIView *view);
+static BDImageView *bht_findStickerImageViewInView(UIView *view);
+static void bht_saveCommentStickerFromImageView(BDImageView *imageView);
 
 %hook BDImageView
 - (void)layoutSubviews {
@@ -889,6 +892,21 @@ static void bht_scheduleTooltipEnrichment(void);
     if ([self bht_isCommentSticker]) {
         sLastActiveStickerView = self;
         bht_scheduleTooltipEnrichment();
+    }
+}
+- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    %orig;
+    // Sticker tıklandı: viewer sheet açılacak, download ikonunu inject et
+    if ([self bht_isCommentSticker] && [BHIManager downloadCommentStickers]) {
+        sLastActiveStickerView = self;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            UIWindow *win = self.window ?: [UIApplication sharedApplication].keyWindow;
+            if (win) bht_injectDownloadIconIntoStickerViewer(win);
+        });
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.60 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            UIWindow *win = self.window ?: [UIApplication sharedApplication].keyWindow;
+            if (win) bht_injectDownloadIconIntoStickerViewer(win);
+        });
     }
 }
 %new - (BOOL)bht_isCommentSticker {
@@ -6189,6 +6207,7 @@ static void bht_saveCommentStickerFromImageView(BDImageView *imageView) {
     if (!baseImg) baseImg = imageView.image;
     if (!baseImg) return;
 
+    BOOL tr = [BHIManager isTurkish];
     NSData *animData = [imageView respondsToSelector:@selector(bd_animatedImageData)] ? [imageView bd_animatedImageData] : nil;
     if (animData && animData.length > 0) {
         [PHPhotoLibrary requestAuthorization:^(PHAuthorizationStatus status) {
@@ -6200,9 +6219,9 @@ static void bht_saveCommentStickerFromImageView(BDImageView *imageView) {
                     dispatch_async(dispatch_get_main_queue(), ^{
                         Class toastCls = NSClassFromString(@"AWEToast");
                         if (success && [toastCls respondsToSelector:@selector(showSuccess:)]) {
-                            [toastCls showSuccess:[BHIManager isTurkish] ? @"Çıkartma Fotoğraflara Kaydedildi" : @"Sticker Saved to Photos"];
+                            [toastCls showSuccess:tr ? @"Çıkartma indirildi" : @"Sticker downloaded"];
                         } else if (!success && [toastCls respondsToSelector:@selector(showError:)]) {
-                            [toastCls showError:[BHIManager isTurkish] ? @"Çıkartma Kaydedilemedi" : @"Failed to Save Sticker"];
+                            [toastCls showError:tr ? @"Çıkartma indirilemedi" : @"Sticker could not be downloaded"];
                         }
                     });
                 }];
@@ -6211,7 +6230,7 @@ static void bht_saveCommentStickerFromImageView(BDImageView *imageView) {
                     UIImageWriteToSavedPhotosAlbum((UIImage *)baseImg, nil, nil, nil);
                     Class toastCls = NSClassFromString(@"AWEToast");
                     if ([toastCls respondsToSelector:@selector(showSuccess:)]) {
-                        [toastCls showSuccess:[BHIManager isTurkish] ? @"Çıkartma Fotoğraflara Kaydedildi" : @"Sticker Saved to Photos"];
+                        [toastCls showSuccess:tr ? @"Çıkartma indirildi" : @"Sticker downloaded"];
                     }
                 });
             }
@@ -6221,7 +6240,7 @@ static void bht_saveCommentStickerFromImageView(BDImageView *imageView) {
         dispatch_async(dispatch_get_main_queue(), ^{
             Class toastCls = NSClassFromString(@"AWEToast");
             if ([toastCls respondsToSelector:@selector(showSuccess:)]) {
-                [toastCls showSuccess:[BHIManager isTurkish] ? @"Çıkartma Fotoğraflara Kaydedildi" : @"Sticker Saved to Photos"];
+                [toastCls showSuccess:tr ? @"Çıkartma indirildi" : @"Sticker downloaded"];
             }
         });
     }
@@ -6251,6 +6270,22 @@ static void bht_saveCommentStickerFromImageView(BDImageView *imageView) {
     if (!targetView) {
         UIWindow *w = self.window ?: [UIApplication sharedApplication].keyWindow;
         targetView = bht_findStickerImageViewInView(w);
+    }
+    if (!targetView) {
+        UIWindow *w = self.window ?: [UIApplication sharedApplication].keyWindow;
+        NSMutableArray *q = [NSMutableArray arrayWithObject:w];
+        while (q.count > 0) {
+            UIView *v = q.firstObject;
+            [q removeObjectAtIndex:0];
+            if ([v isKindOfClass:NSClassFromString(@"BDImageView")]) {
+                BDImageView *bdiv = (BDImageView *)v;
+                if (bdiv.bounds.size.width > 30 && bdiv.bounds.size.height > 30) {
+                    targetView = bdiv;
+                    break;
+                }
+            }
+            for (UIView *sub in v.subviews) [q addObject:sub];
+        }
     }
     if (targetView) {
         bht_saveCommentStickerFromImageView(targetView);
@@ -6412,7 +6447,7 @@ static void bht_injectSaveStickerButtonToBubbleIfNeeded(UIView *menuView, UIView
         sep.frame = CGRectMake(12, rowH, targetW - 24, 0.5);
     }
     
-    // 2. Satır: "Çıkartmayı fotoğraflara indir" butonu
+    // 2. Satır: "Çıkartmayı indir" butonu - aynı tasarımda (koyu baloncuk içinde beyaz ikon+metin)
     UIButton *dlBtn = (UIButton *)[menuView viewWithTag:88991];
     if (!dlBtn) {
         dlBtn = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -6433,7 +6468,7 @@ static void bht_injectSaveStickerButtonToBubbleIfNeeded(UIView *menuView, UIView
         
         UILabel *tl = [[UILabel alloc] initWithFrame:CGRectMake(40, 0, targetW - 48, rowH)];
         tl.userInteractionEnabled = NO;
-        tl.text = [BHIManager isTurkish] ? @"Çıkartmayı fotoğraflara indir" : @"Download sticker to Photos";
+        tl.text = [BHIManager isTurkish] ? @"Çıkartmayı indir" : @"Download sticker";
         tl.textColor = [UIColor colorWithWhite:0.92 alpha:1.0];
         tl.font = [UIFont systemFontOfSize:13.5 weight:UIFontWeightMedium];
         tl.backgroundColor = [UIColor clearColor];
@@ -6555,13 +6590,8 @@ static void bht_setupPanelFullRowStickerDownload(UIViewController *vc) {
     UIView *cardView = stickerCell.superview;
     if (!cardView) return;
     
-    // ÖNEMLİ (BUG FIX): Layout henüz hazır değilse veya frame 0 ise butonu gizle ve konumlandırma!
-    // Bu sayede buton açılışta yukarıda görünüp aşağı atlamaz (jumping bug önlendi).
+    // Frame henüz hazır değilse işlem yapma (erken layout'ta zıplamayı önle)
     if (stickerCell.frame.origin.y <= 0 || stickerCell.bounds.size.height <= 0) {
-        UIView *oldBtn = [cardView viewWithTag:88995];
-        if (oldBtn) oldBtn.hidden = YES;
-        UIView *oldSep = [cardView viewWithTag:88996];
-        if (oldSep) oldSep.hidden = YES;
         return;
     }
     
@@ -6569,96 +6599,138 @@ static void bht_setupPanelFullRowStickerDownload(UIViewController *vc) {
     CGFloat cellW = stickerCell.bounds.size.width > 0 ? stickerCell.bounds.size.width : cardView.bounds.size.width;
     CGFloat btnY = CGRectGetMaxY(stickerCell.frame);
     
-    // Gri kartın yüksekliğini artır (NSLayoutConstraint ve frame)
-    CGFloat neededH = btnY + rowH + (saveCell ? saveCell.bounds.size.height : 0) + 8.0;
-    CGRect cf = cardView.frame;
-    if (cf.size.height < neededH) {
+    CGFloat saveCellH = (saveCell && saveCell.superview == cardView) ? saveCell.bounds.size.height : 0;
+    CGFloat neededH = btnY + rowH + saveCellH + 4.0;
+    
+    UIButton *rowBtn = (UIButton *)[cardView viewWithTag:88995];
+    
+    // Eğer buton zaten doğru yerleştirilmiş ve kart boyutu doğruysa tekrar hesaplama yapma (layout shift önlendi)
+    if (rowBtn && rowBtn.superview == cardView && !rowBtn.hidden && fabs(cardView.bounds.size.height - neededH) < 2.0) {
+        return;
+    }
+    
+    // stickerCell içindeki ikon ve metin hizalamasını örnek al (pixel-perfect alignment)
+    UIImageView *sampleIV = nil;
+    UILabel *sampleLbl = nil;
+    for (UIView *sub in stickerCell.subviews) {
+        if ([sub isKindOfClass:[UIImageView class]]) sampleIV = (UIImageView *)sub;
+        else if ([sub isKindOfClass:[UILabel class]]) sampleLbl = (UILabel *)sub;
+        for (UIView *sub2 in sub.subviews) {
+            if (!sampleIV && [sub2 isKindOfClass:[UIImageView class]]) sampleIV = (UIImageView *)sub2;
+            if (!sampleLbl && [sub2 isKindOfClass:[UILabel class]]) sampleLbl = (UILabel *)sub2;
+        }
+    }
+    
+    CGFloat iconX = (sampleIV && sampleIV.frame.origin.x > 5.0) ? sampleIV.frame.origin.x : 20.0;
+    CGFloat iconW = (sampleIV && sampleIV.frame.size.width > 0) ? sampleIV.frame.size.width : 22.0;
+    CGFloat iconH = (sampleIV && sampleIV.frame.size.height > 0) ? sampleIV.frame.size.height : 22.0;
+    CGFloat iconY = (rowH - iconH) / 2.0;
+    
+    CGFloat lblX = (sampleLbl && sampleLbl.frame.origin.x > 20.0) ? sampleLbl.frame.origin.x : 56.0;
+    CGFloat lblW = cellW - lblX - 16.0;
+    
+    [UIView performWithoutAnimation:^{
+        // Gri kart tasarımı: tüm hücrelerin aynı açık gri tonda olmasını sağla
+        cardView.backgroundColor = [UIColor colorWithRed:36/255.0 green:36/255.0 blue:38/255.0 alpha:1.0];
+        cardView.layer.cornerRadius = 14.0;
+        cardView.layer.masksToBounds = YES;
+        cardView.clipsToBounds = YES;
+        
+        CGRect cf = cardView.frame;
         cf.size.height = neededH;
         cardView.frame = cf;
-    }
-    cardView.clipsToBounds = NO;
-    for (NSLayoutConstraint *c in cardView.constraints) {
-        if (c.firstAttribute == NSLayoutAttributeHeight && c.constant < neededH) {
-            c.constant = neededH;
+        
+        for (NSLayoutConstraint *c in cardView.constraints) {
+            if (c.firstAttribute == NSLayoutAttributeHeight && c.constant < neededH) {
+                c.constant = neededH;
+            }
         }
-    }
-    
-    // Eğer "Kaydet" hücresi varsa onu aşağı kaydırarak araya tam satır açıyoruz
-    if (saveCell && saveCell != stickerCell && saveCell.superview == cardView) {
-        CGRect sf = saveCell.frame;
-        sf.origin.y = btnY + rowH;
-        saveCell.frame = sf;
-    }
-    
-    // İnce satır ayırıcısı
-    UIView *rowSep = [cardView viewWithTag:88996];
-    if (!rowSep) {
-        rowSep = [[UIView alloc] initWithFrame:CGRectMake(52, btnY, cellW - 52, 0.5)];
-        rowSep.tag = 88996;
-        rowSep.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.06];
-        [cardView addSubview:rowSep];
-    } else {
-        rowSep.frame = CGRectMake(52, btnY, cellW - 52, 0.5);
-    }
-    rowSep.hidden = NO;
-    
-    // Buton oluşturma veya güncelleme
-    UIButton *rowBtn = (UIButton *)[cardView viewWithTag:88995];
-    if (!rowBtn) {
-        rowBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-        rowBtn.tag = 88995;
-        rowBtn.backgroundColor = [UIColor clearColor];
-        rowBtn.layer.cornerRadius = 0;
-        rowBtn.layer.masksToBounds = NO;
         
-        UIImageView *iv = [[UIImageView alloc] initWithFrame:CGRectMake(16, (rowH - 20) / 2.0, 20, 20)];
-        iv.tag = 88997;
-        iv.userInteractionEnabled = NO;
-        iv.contentMode = UIViewContentModeScaleAspectFit;
-        
-        UIImage *icon = nil;
-        if (@available(iOS 13.0, *)) {
-            UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:16.5 weight:UIImageSymbolWeightRegular];
-            icon = [UIImage systemImageNamed:@"arrow.down.to.line" withConfiguration:cfg];
-            if (!icon) icon = [UIImage systemImageNamed:@"square.and.arrow.down" withConfiguration:cfg];
+        // "Kaydet" hücresini aşağı kaydır
+        if (saveCell && saveCell != stickerCell && saveCell.superview == cardView) {
+            CGRect sf = saveCell.frame;
+            sf.origin.y = btnY + rowH;
+            saveCell.frame = sf;
+            saveCell.backgroundColor = [UIColor clearColor];
         }
-        // İkon rengi kesinlikle BEYAZ/KIRIK BEYAZ (Mavi değil!)
-        iv.image = [icon imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-        iv.tintColor = [UIColor colorWithWhite:0.90 alpha:1.0];
-        [rowBtn addSubview:iv];
+        if (stickerCell) {
+            stickerCell.backgroundColor = [UIColor clearColor];
+        }
         
-        UILabel *tl = [[UILabel alloc] initWithFrame:CGRectMake(52, 0, cellW - 68, rowH)];
-        tl.tag = 88998;
-        tl.userInteractionEnabled = NO;
-        tl.text = [BHIManager isTurkish] ? @"Çıkartmayı fotoğraflara indir" : @"Download sticker to Photos";
-        tl.font = [UIFont systemFontOfSize:14.5 weight:UIFontWeightRegular];
-        tl.textColor = [UIColor colorWithWhite:0.90 alpha:1.0];
-        tl.backgroundColor = [UIColor clearColor];
-        [rowBtn addSubview:tl];
+        // İnce satır ayırıcı (metin hizasından başlar)
+        UIView *rowSep = [cardView viewWithTag:88996];
+        if (!rowSep) {
+            rowSep = [[UIView alloc] initWithFrame:CGRectMake(lblX, btnY, cellW - lblX, 0.5)];
+            rowSep.tag = 88996;
+            rowSep.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.08];
+            [cardView addSubview:rowSep];
+        } else {
+            rowSep.frame = CGRectMake(lblX, btnY, cellW - lblX, 0.5);
+        }
+        rowSep.hidden = NO;
         
-        [rowBtn addTarget:vc action:@selector(bht_onPanelFullRowDownloadTapped) forControlEvents:UIControlEventTouchUpInside];
-        [cardView addSubview:rowBtn];
-    } else {
-        UILabel *tl = (UILabel *)[rowBtn viewWithTag:88998];
-        if (tl) {
+        // Buton
+        UIButton *btn = (UIButton *)[cardView viewWithTag:88995];
+        if (!btn) {
+            btn = [UIButton buttonWithType:UIButtonTypeCustom];
+            btn.tag = 88995;
+            btn.backgroundColor = [UIColor clearColor];
+            btn.layer.cornerRadius = 0;
+            btn.layer.masksToBounds = NO;
+            
+            UIImageView *iv = [[UIImageView alloc] initWithFrame:CGRectMake(iconX, iconY, iconW, iconH)];
+            iv.tag = 88997;
+            iv.userInteractionEnabled = NO;
+            iv.contentMode = UIViewContentModeScaleAspectFit;
+            
+            UIImage *icon = nil;
+            if (@available(iOS 13.0, *)) {
+                UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:16.5 weight:UIImageSymbolWeightRegular];
+                icon = [UIImage systemImageNamed:@"arrow.down.to.line" withConfiguration:cfg];
+                if (!icon) icon = [UIImage systemImageNamed:@"square.and.arrow.down" withConfiguration:cfg];
+            }
+            iv.image = [icon imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+            iv.tintColor = sampleIV ? sampleIV.tintColor : [UIColor colorWithWhite:0.90 alpha:1.0];
+            [btn addSubview:iv];
+            
+            UILabel *tl = [[UILabel alloc] initWithFrame:CGRectMake(lblX, 0, lblW, rowH)];
+            tl.tag = 88998;
+            tl.userInteractionEnabled = NO;
             tl.text = [BHIManager isTurkish] ? @"Çıkartmayı fotoğraflara indir" : @"Download sticker to Photos";
-            tl.textColor = [UIColor colorWithWhite:0.90 alpha:1.0];
+            tl.font = sampleLbl ? sampleLbl.font : [UIFont systemFontOfSize:15.0 weight:UIFontWeightRegular];
+            tl.textColor = sampleLbl ? sampleLbl.textColor : [UIColor colorWithWhite:0.90 alpha:1.0];
+            tl.backgroundColor = [UIColor clearColor];
+            [btn addSubview:tl];
+            
+            [btn addTarget:vc action:@selector(bht_onPanelFullRowDownloadTapped) forControlEvents:UIControlEventTouchUpInside];
+            [cardView addSubview:btn];
+        } else {
+            UIImageView *iv = (UIImageView *)[btn viewWithTag:88997];
+            if (iv) {
+                iv.frame = CGRectMake(iconX, iconY, iconW, iconH);
+                iv.tintColor = sampleIV ? sampleIV.tintColor : [UIColor colorWithWhite:0.90 alpha:1.0];
+            }
+            UILabel *tl = (UILabel *)[btn viewWithTag:88998];
+            if (tl) {
+                tl.frame = CGRectMake(lblX, 0, lblW, rowH);
+                tl.text = [BHIManager isTurkish] ? @"Çıkartmayı fotoğraflara indir" : @"Download sticker to Photos";
+                if (sampleLbl) {
+                    tl.font = sampleLbl.font;
+                    tl.textColor = sampleLbl.textColor;
+                }
+            }
         }
-        UIImageView *iv = (UIImageView *)[rowBtn viewWithTag:88997];
-        if (iv) {
-            iv.tintColor = [UIColor colorWithWhite:0.90 alpha:1.0];
+        
+        btn.frame = CGRectMake(0, btnY, cellW, rowH);
+        btn.hidden = NO;
+        
+        if (containerScroll) {
+            CGFloat totalScrollH = CGRectGetMaxY(cardView.frame) + 32.0;
+            if (containerScroll.contentSize.height < totalScrollH) {
+                containerScroll.contentSize = CGSizeMake(containerScroll.contentSize.width, totalScrollH);
+            }
         }
-    }
-    
-    rowBtn.frame = CGRectMake(0, btnY, cellW, rowH);
-    rowBtn.hidden = NO;
-    
-    if (containerScroll) {
-        CGFloat totalScrollH = CGRectGetMaxY(cardView.frame) + 32.0;
-        if (containerScroll.contentSize.height < totalScrollH) {
-            containerScroll.contentSize = CGSizeMake(containerScroll.contentSize.width, totalScrollH);
-        }
-    }
+    }];
 }
 
 %hook _TtC17TikTokCommentImpl34CommentCellLongPressViewController
@@ -6672,6 +6744,22 @@ static void bht_setupPanelFullRowStickerDownload(UIViewController *vc) {
     if (!targetView) {
         UIWindow *w = self.view.window ?: [UIApplication sharedApplication].keyWindow;
         targetView = bht_findStickerImageViewInView(w);
+    }
+    if (!targetView) {
+        UIWindow *w = self.view.window ?: [UIApplication sharedApplication].keyWindow;
+        NSMutableArray *q = [NSMutableArray arrayWithObject:w];
+        while (q.count > 0) {
+            UIView *v = q.firstObject;
+            [q removeObjectAtIndex:0];
+            if ([v isKindOfClass:NSClassFromString(@"BDImageView")]) {
+                BDImageView *bdiv = (BDImageView *)v;
+                if (bdiv.bounds.size.width > 30 && bdiv.bounds.size.height > 30) {
+                    targetView = bdiv;
+                    break;
+                }
+            }
+            for (UIView *sub in v.subviews) [q addObject:sub];
+        }
     }
     if (targetView) {
         bht_saveCommentStickerFromImageView(targetView);
@@ -6691,6 +6779,22 @@ static void bht_setupPanelFullRowStickerDownload(UIViewController *vc) {
     if (!targetView) {
         UIWindow *w = self.view.window ?: [UIApplication sharedApplication].keyWindow;
         targetView = bht_findStickerImageViewInView(w);
+    }
+    if (!targetView) {
+        UIWindow *w = self.view.window ?: [UIApplication sharedApplication].keyWindow;
+        NSMutableArray *q = [NSMutableArray arrayWithObject:w];
+        while (q.count > 0) {
+            UIView *v = q.firstObject;
+            [q removeObjectAtIndex:0];
+            if ([v isKindOfClass:NSClassFromString(@"BDImageView")]) {
+                BDImageView *bdiv = (BDImageView *)v;
+                if (bdiv.bounds.size.width > 30 && bdiv.bounds.size.height > 30) {
+                    targetView = bdiv;
+                    break;
+                }
+            }
+            for (UIView *sub in v.subviews) [q addObject:sub];
+        }
     }
     if (targetView) {
         bht_saveCommentStickerFromImageView(targetView);
@@ -6801,6 +6905,130 @@ static void bht_setupPanelFullRowStickerDownload(UIViewController *vc) {
         }
     }
     %orig;
+}
+%end
+
+// ============================================================
+// SENARYO 2: Sticker Viewer (Resim 3)
+// Çıkartmaya tıklandığında açılan Paylaş/Kaydet sheet'i.
+// Pembe "Kaydet" butonunun sağına indirme ikonu eklenir.
+// ============================================================
+
+static void bht_injectDownloadIconIntoStickerViewer(UIView *view) {
+    if (![BHIManager downloadCommentStickers] || !view) return;
+    
+    // "Kaydet" metnine sahip pembe/kırmızı butonu bul
+    UIButton *saveBtn = nil;
+    NSMutableArray *q2 = [NSMutableArray arrayWithObject:view];
+    while (q2.count > 0) {
+        UIView *v = q2.firstObject;
+        [q2 removeObjectAtIndex:0];
+        if ([v isKindOfClass:[UIButton class]]) {
+            UIButton *b = (UIButton *)v;
+            NSString *title = [b titleForState:UIControlStateNormal];
+            if (!title) {
+                for (UIView *sub in b.subviews) {
+                    if ([sub isKindOfClass:[UILabel class]]) {
+                        title = [(UILabel *)sub text];
+                        if (title) break;
+                    }
+                }
+            }
+            if (title && ([title isEqualToString:@"Kaydet"] || [title isEqualToString:@"Save"])) {
+                saveBtn = b;
+                break;
+            }
+        }
+        for (UIView *sub in v.subviews) [q2 addObject:sub];
+    }
+    
+    if (!saveBtn) return;
+    if ([saveBtn viewWithTag:88999]) {
+        UIButton *existingBtn = (UIButton *)[saveBtn viewWithTag:88999];
+        CGFloat btnW = saveBtn.bounds.size.width;
+        CGFloat btnH = saveBtn.bounds.size.height > 0 ? saveBtn.bounds.size.height : 44.0;
+        if (btnW > 0) {
+            existingBtn.frame = CGRectMake(btnW - 48.0, 0, 48.0, btnH);
+        }
+        return;
+    }
+    
+    CGFloat btnW = saveBtn.bounds.size.width;
+    CGFloat btnH = saveBtn.bounds.size.height > 0 ? saveBtn.bounds.size.height : 44.0;
+    if (btnW <= 0) return;
+    
+    // Doğrudan saveBtn içine en sağa hizalı ekliyoruz
+    UIButton *dlIconBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    dlIconBtn.tag = 88999;
+    dlIconBtn.frame = CGRectMake(btnW - 48.0, 0, 48.0, btnH);
+    dlIconBtn.backgroundColor = [UIColor clearColor];
+    
+    UIImage *dlIcon = nil;
+    if (@available(iOS 13.0, *)) {
+        UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:17.0 weight:UIImageSymbolWeightSemibold];
+        dlIcon = [UIImage systemImageNamed:@"arrow.down.to.line" withConfiguration:cfg];
+        if (!dlIcon) dlIcon = [UIImage systemImageNamed:@"square.and.arrow.down" withConfiguration:cfg];
+    }
+    
+    UIImageView *iv = [[UIImageView alloc] initWithFrame:CGRectMake((48.0 - 20.0) / 2.0, (btnH - 20.0) / 2.0, 20.0, 20.0)];
+    iv.userInteractionEnabled = NO;
+    iv.contentMode = UIViewContentModeScaleAspectFit;
+    iv.image = [dlIcon imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    iv.tintColor = [UIColor whiteColor];
+    [dlIconBtn addSubview:iv];
+    
+    dlIconBtn.userInteractionEnabled = YES;
+    [dlIconBtn addTarget:dlIconBtn action:@selector(bht_stickerViewerDownloadTapped) forControlEvents:UIControlEventTouchUpInside];
+    
+    saveBtn.clipsToBounds = NO;
+    saveBtn.userInteractionEnabled = YES;
+    [saveBtn addSubview:dlIconBtn];
+}
+
+%hook _TtC17TikTokIMImplSwift34IMStickerDetailPanelViewController
+- (void)viewDidLayoutSubviews {
+    %orig;
+    if ([BHIManager downloadCommentStickers]) {
+        bht_injectDownloadIconIntoStickerViewer(self.view);
+    }
+}
+%end
+
+%hook _TtC17TikTokIMImplSwift40IMStickerDetailPanelActionViewController
+- (void)viewDidLayoutSubviews {
+    %orig;
+    if ([BHIManager downloadCommentStickers]) {
+        bht_injectDownloadIconIntoStickerViewer(self.view);
+    }
+}
+%end
+
+%hook UIView
+%new - (void)bht_stickerViewerDownloadTapped {
+    BDImageView *targetView = sLastActiveStickerView;
+    if (!targetView) {
+        UIWindow *w = self.window ?: [UIApplication sharedApplication].keyWindow;
+        targetView = bht_findStickerImageViewInView(w);
+    }
+    if (!targetView) {
+        UIWindow *w = self.window ?: [UIApplication sharedApplication].keyWindow;
+        NSMutableArray *q = [NSMutableArray arrayWithObject:w];
+        while (q.count > 0) {
+            UIView *v = q.firstObject;
+            [q removeObjectAtIndex:0];
+            if ([v isKindOfClass:NSClassFromString(@"BDImageView")]) {
+                BDImageView *bdiv = (BDImageView *)v;
+                if (bdiv.bounds.size.width > 40 && bdiv.bounds.size.height > 40) {
+                    targetView = bdiv;
+                    break;
+                }
+            }
+            for (UIView *sub in v.subviews) [q addObject:sub];
+        }
+    }
+    if (targetView) {
+        bht_saveCommentStickerFromImageView(targetView);
+    }
 }
 %end
 
