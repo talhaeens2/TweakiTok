@@ -28,7 +28,7 @@ An awesome, modern TikTok tweak for iOS that blocks ads and unlocks more feature
 - **Show Commenter Handle and Region**: Displays commenter @handle and country flag in comments.
 - **Copy Comment Without Username**: Copies comment text without the author's handle.
 - **Auto Translate Comments**: Automatically translates comments into your preferred language on load.
-- **Download Comment Stickers**: Save stickers from comments to Photos app via direct long-press or comment context menu.
+- **Download Comment Stickers**: Save stickers from comments to Photos via long-press or comment context menu.
 - **Remember Clear Display**: Keeps clear display mode active when scrolling across videos.
 - **Resume Videos After Scrolling**: Resumes playback from where you left off when returning to a previous video.
 - **Keep Screen Refresh Rate (120 Hz)**: Prevents refresh rate drops in videos, stories, and feed on ProMotion displays.
