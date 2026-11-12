@@ -50,7 +50,7 @@ An awesome, modern TikTok tweak for iOS that blocks ads and unlocks more feature
 - **Disable Sensitive Content Warnings**: Bypasses intrusive content warning screens.
 - **Restart Notice Banner**: Adaptive toast notification prompting restart when settings change.
 - **Backup & Restore Settings**: Export and import settings to/from date-stamped .json files via Files app.
-- **Developer Mode & Global Crash Logger**: Centralized crash handler intercepting Objective-C exceptions and POSIX signals, logging human-readable diagnostics and call stack traces to `TweakiTok_Crash.txt` in the iOS Files app (`Dosyalar > iPhone'umda > TikTok`).
+- **Developer Mode & Global Crash Logger**: Centralized crash handler intercepting Objective-C exceptions and POSIX signals, logging human-readable diagnostics and call stack traces to date-stamped `TweakiTok_Crash_*.txt` files in the iOS Files app (`Dosyalar > iPhone'umda > TikTok`).
 - **Security Bypasses**: Bypasses jailbreak detection and environment checks.
 
 ## GitHub Actions & Prebuilt Releases

@@ -663,7 +663,7 @@
         switch (indexPath.row) {
             case 0:
                 return [self createSwitchCellWithTitle:tr ? @"Geliştirici Modu" : @"Developer Mode"
-                                                Detail:tr ? @"Çökme günlüklerini (crash log) Dosyalar uygulamasında TweakiTok_Crash.txt olarak kaydeder" : @"Logs app crashes to TweakiTok_Crash.txt in Files app for debugging"
+                                                Detail:tr ? @"Çökme günlüklerini (crash log) Dosyalar uygulamasında tarih ve saat ile (TweakiTok_Crash_*.txt) kaydeder" : @"Logs timestamped app crashes (TweakiTok_Crash_*.txt) to Files app for debugging"
                                                    Key:@"developer_mode"];
             case 1: {
                 UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:nil];

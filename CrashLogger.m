@@ -12,6 +12,7 @@
 static NSUncaughtExceptionHandler *sPreviousExceptionHandler = NULL;
 static struct sigaction sPreviousSigActions[32];
 static char sCrashLogPath[1024] = {0};
+static char sDocsPath[1024] = {0};
 static volatile BOOL sDeveloperModeCached = NO;
 static char sAlternateStack[SIGSTKSZ * 4];
 
@@ -110,9 +111,27 @@ static void TTK_UncaughtExceptionHandler(NSException *exception) {
     // Sadece Geliştirici Modu açıksa log kaydet
     if ([BHIManager developerMode]) {
         @try {
+            if (sDocsPath[0] == '\0') {
+                NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+                NSString *docs = paths.firstObject;
+                if (docs) {
+                    strncpy(sDocsPath, [docs UTF8String], sizeof(sDocsPath) - 1);
+                }
+            }
+            
+            NSDate *now = [NSDate date];
             NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
             [formatter setDateFormat:@"yyyy-MM-dd HH:mm:ss.SSS Z"];
-            NSString *dateStr = [formatter stringFromDate:[NSDate date]];
+            NSString *dateStr = [formatter stringFromDate:now];
+            
+            NSDateFormatter *fileFormatter = [[NSDateFormatter alloc] init];
+            [fileFormatter setDateFormat:@"yyyy-MM-dd_HH-mm-ss"];
+            NSString *fileDateStr = [fileFormatter stringFromDate:now];
+            NSString *fileName = [NSString stringWithFormat:@"TweakiTok_Crash_%@.txt", fileDateStr];
+            
+            NSString *docs = sDocsPath[0] != '\0' ? [NSString stringWithUTF8String:sDocsPath] : NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+            NSString *filePath = [docs stringByAppendingPathComponent:fileName];
+            strncpy(sCrashLogPath, [filePath UTF8String], sizeof(sCrashLogPath) - 1);
             
             NSDictionary *infoDict = [[NSBundle mainBundle] infoDictionary];
             NSString *appVersion = infoDict[@"CFBundleShortVersionString"] ?: @"Unknown";
@@ -135,6 +154,7 @@ static void TTK_UncaughtExceptionHandler(NSException *exception) {
             [report appendString:@"🚨 TWEAKITOK CRASH REPORT (UNCAUGHT EXCEPTION)\n"];
             [report appendString:@"================================================================\n"];
             [report appendFormat:@"Tarih / Saat       : %@\n", dateStr];
+            [report appendFormat:@"Günlük Dosyası     : %@\n", fileName];
             [report appendFormat:@"Uygulama Sürümü    : TikTok v%@ (Build %@)\n", appVersion, appBuild];
             [report appendFormat:@"Cihaz Modeli       : %@ (iOS %@)\n", deviceModel, osVersion];
             [report appendFormat:@"Aktif Ekran (TopVC): %@\n", topVCName];
@@ -181,6 +201,18 @@ static void TTK_SignalCrashHandler(int sig, siginfo_t *info, void *context) {
         char timeBuf[64];
         strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%d %H:%M:%S", &tm_info);
         
+        char fileDateBuf[64];
+        strftime(fileDateBuf, sizeof(fileDateBuf), "%Y-%m-%d_%H-%M-%S", &tm_info);
+        
+        char fileName[128];
+        snprintf(fileName, sizeof(fileName), "TweakiTok_Crash_%s.txt", fileDateBuf);
+        
+        if (sDocsPath[0] != '\0') {
+            snprintf(sCrashLogPath, sizeof(sCrashLogPath), "%s/%s", sDocsPath, fileName);
+        } else {
+            snprintf(sCrashLogPath, sizeof(sCrashLogPath), "%s", fileName);
+        }
+        
         void *addr = info ? info->si_addr : NULL;
         int code = info ? info->si_code : 0;
         const char *sigName = "UNKNOWN";
@@ -201,13 +233,14 @@ static void TTK_SignalCrashHandler(int sig, siginfo_t *info, void *context) {
                  "🚨 TWEAKITOK CRASH REPORT (POSIX SIGNAL CRASH)\n"
                  "================================================================\n"
                  "Tarih / Saat       : %s\n"
+                 "Günlük Dosyası     : %s\n"
                  "Alınan Sinyal      : %s (No: %d, Code: %d)\n"
                  "Hata Adresi (Addr) : %p\n"
                  "----------------------------------------------------------------\n"
                  "Açık Analiz        : %s\n"
                  "----------------------------------------------------------------\n"
                  "Çağrı Yığını (Backtrace Symbols):\n",
-                 timeBuf, sigName, sig, code, addr, explanation);
+                 timeBuf, fileName, sigName, sig, code, addr, explanation);
         
         TTK_WriteRawLog(header);
         
@@ -273,13 +306,12 @@ static void TTK_InstallHandlersIfNeeded(void) {
 void TTK_SetupGlobalCrashLogger(void) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        // 1. Documents klasörünü hazırla ve dosya yolunu önceden kaydet
+        // 1. Documents klasörünü hazırla
         NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
         NSString *docs = paths.firstObject;
         if (docs) {
             [[NSFileManager defaultManager] createDirectoryAtPath:docs withIntermediateDirectories:YES attributes:nil error:nil];
-            NSString *filePath = [docs stringByAppendingPathComponent:@"TweakiTok_Crash.txt"];
-            strncpy(sCrashLogPath, [filePath UTF8String], sizeof(sCrashLogPath) - 1);
+            strncpy(sDocsPath, [docs UTF8String], sizeof(sDocsPath) - 1);
         }
         
         // 2. Geliştirici Modu durumunu kontrol et
@@ -306,7 +338,20 @@ NSString *TTK_GetCrashLogFilePath(void) {
         return [NSString stringWithUTF8String:sCrashLogPath];
     }
     NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-    return [paths.firstObject stringByAppendingPathComponent:@"TweakiTok_Crash.txt"];
+    NSString *docs = paths.firstObject;
+    if (!docs) return nil;
+    
+    // Varsa en son oluşturulan tarihli TweakiTok_Crash_*.txt dosyasını bul
+    NSError *error = nil;
+    NSArray *files = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:docs error:&error];
+    NSPredicate *predicate = [NSPredicate predicateWithFormat:@"SELF BEGINSWITH 'TweakiTok_Crash' AND SELF ENDSWITH '.txt'"];
+    NSArray *crashFiles = [files filteredArrayUsingPredicate:predicate];
+    if (crashFiles.count > 0) {
+        NSArray *sorted = [crashFiles sortedArrayUsingSelector:@selector(compare:)];
+        return [docs stringByAppendingPathComponent:sorted.lastObject];
+    }
+    
+    return [docs stringByAppendingPathComponent:@"TweakiTok_Crash.txt"];
 }
 
 BOOL TTK_IsDeveloperModeEnabled(void) {
