@@ -6544,6 +6544,18 @@ static void bht_injectSaveStickerButtonToBubbleIfNeeded(UIView *menuView, UIView
 static void bht_setupPanelFullRowStickerDownload(UIViewController *vc) {
     if (!vc || ![BHIManager downloadCommentStickers]) return;
     
+    // Açılış geçişi (presentation animation) sırasında arayüzün sıçramasını / yukarıda render edilmesini önle
+    if (vc.isBeingPresented) {
+        if (vc.transitionCoordinator) {
+            [vc.transitionCoordinator animateAlongsideTransition:nil completion:^(id<UIViewControllerTransitionCoordinatorContext> _Nonnull context) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    bht_setupPanelFullRowStickerDownload(vc);
+                });
+            }];
+            return;
+        }
+    }
+    
     BOOL hasStickerAction = NO;
     UIView *stickerCell = nil;
     UIView *saveCell = nil;
@@ -6590,8 +6602,11 @@ static void bht_setupPanelFullRowStickerDownload(UIViewController *vc) {
     UIView *cardView = stickerCell.superview;
     if (!cardView) return;
     
-    // Frame henüz hazır değilse işlem yapma (erken layout'ta zıplamayı önle)
-    if (stickerCell.frame.origin.y <= 0 || stickerCell.bounds.size.height <= 0) {
+    // Alt sayfa henüz ekranın altına oturmamışsa (yukarıda ise) erken çizim yapma
+    CGRect cardInView = [cardView convertRect:cardView.bounds toView:vc.view];
+    if (cardInView.origin.y < 80.0 || stickerCell.frame.origin.y < 35.0 || stickerCell.bounds.size.height < 30.0 || cardView.bounds.size.width < 150.0) {
+        UIButton *existingBtn = (UIButton *)[cardView viewWithTag:88995];
+        if (existingBtn) existingBtn.hidden = YES;
         return;
     }
     
@@ -6603,13 +6618,11 @@ static void bht_setupPanelFullRowStickerDownload(UIViewController *vc) {
     CGFloat neededH = btnY + rowH + saveCellH + 4.0;
     
     UIButton *rowBtn = (UIButton *)[cardView viewWithTag:88995];
-    
-    // Eğer buton zaten doğru yerleştirilmiş ve kart boyutu doğruysa tekrar hesaplama yapma (layout shift önlendi)
     if (rowBtn && rowBtn.superview == cardView && !rowBtn.hidden && fabs(cardView.bounds.size.height - neededH) < 2.0) {
         return;
     }
     
-    // stickerCell içindeki ikon ve metin hizalamasını örnek al (pixel-perfect alignment)
+    // stickerCell içindeki ikon ve metin hizalamasını tam olarak örnek al (pixel-perfect alignment)
     UIImageView *sampleIV = nil;
     UILabel *sampleLbl = nil;
     for (UIView *sub in stickerCell.subviews) {
@@ -6621,17 +6634,33 @@ static void bht_setupPanelFullRowStickerDownload(UIViewController *vc) {
         }
     }
     
-    CGFloat iconX = (sampleIV && sampleIV.frame.origin.x > 5.0) ? sampleIV.frame.origin.x : 20.0;
-    CGFloat iconW = (sampleIV && sampleIV.frame.size.width > 0) ? sampleIV.frame.size.width : 22.0;
-    CGFloat iconH = (sampleIV && sampleIV.frame.size.height > 0) ? sampleIV.frame.size.height : 22.0;
+    CGFloat iconX = 18.0;
+    CGFloat iconW = 22.0;
+    CGFloat iconH = 22.0;
+    if (sampleIV) {
+        CGPoint pt = [sampleIV convertPoint:CGPointZero toView:stickerCell];
+        if (pt.x >= 8.0 && pt.x < cellW / 2.0) {
+            iconX = pt.x;
+        }
+        if (sampleIV.bounds.size.width > 10.0) iconW = sampleIV.bounds.size.width;
+        if (sampleIV.bounds.size.height > 10.0) iconH = sampleIV.bounds.size.height;
+    }
     CGFloat iconY = (rowH - iconH) / 2.0;
     
-    CGFloat lblX = (sampleLbl && sampleLbl.frame.origin.x > 20.0) ? sampleLbl.frame.origin.x : 56.0;
+    CGFloat lblX = 56.0;
+    if (sampleLbl) {
+        CGPoint pt = [sampleLbl convertPoint:CGPointZero toView:stickerCell];
+        if (pt.x >= 25.0 && pt.x < cellW) {
+            lblX = pt.x;
+        }
+    }
     CGFloat lblW = cellW - lblX - 16.0;
     
+    // Üstteki butonların açık gri kart rengi
+    UIColor *cardBg = [UIColor colorWithRed:38/255.0 green:38/255.0 blue:40/255.0 alpha:1.0];
+    
     [UIView performWithoutAnimation:^{
-        // Gri kart tasarımı: tüm hücrelerin aynı açık gri tonda olmasını sağla
-        cardView.backgroundColor = [UIColor colorWithRed:36/255.0 green:36/255.0 blue:38/255.0 alpha:1.0];
+        cardView.backgroundColor = cardBg;
         cardView.layer.cornerRadius = 14.0;
         cardView.layer.masksToBounds = YES;
         cardView.clipsToBounds = YES;
@@ -6640,24 +6669,22 @@ static void bht_setupPanelFullRowStickerDownload(UIViewController *vc) {
         cf.size.height = neededH;
         cardView.frame = cf;
         
-        for (NSLayoutConstraint *c in cardView.constraints) {
-            if (c.firstAttribute == NSLayoutAttributeHeight && c.constant < neededH) {
-                c.constant = neededH;
-            }
+        // Üst hücrenin alt köşelerindeki yuvarlaklığı kaldırarak aradaki boşluğu kapat
+        if (@available(iOS 11.0, *)) {
+            stickerCell.layer.cornerRadius = 0.0;
+            stickerCell.layer.maskedCorners = 0;
         }
+        stickerCell.backgroundColor = cardBg;
         
         // "Kaydet" hücresini aşağı kaydır
         if (saveCell && saveCell != stickerCell && saveCell.superview == cardView) {
             CGRect sf = saveCell.frame;
             sf.origin.y = btnY + rowH;
             saveCell.frame = sf;
-            saveCell.backgroundColor = [UIColor clearColor];
-        }
-        if (stickerCell) {
-            stickerCell.backgroundColor = [UIColor clearColor];
+            saveCell.backgroundColor = cardBg;
         }
         
-        // İnce satır ayırıcı (metin hizasından başlar)
+        // İnce satır ayırıcı (üst hücre ile bizim buton arasına)
         UIView *rowSep = [cardView viewWithTag:88996];
         if (!rowSep) {
             rowSep = [[UIView alloc] initWithFrame:CGRectMake(lblX, btnY, cellW - lblX, 0.5)];
@@ -6669,14 +6696,17 @@ static void bht_setupPanelFullRowStickerDownload(UIViewController *vc) {
         }
         rowSep.hidden = NO;
         
-        // Buton
+        // Buton: üstteki hücrelerle birebir aynı açık gri arkaplan, beyaz ikon ve alt köşe yuvarlaklığı
         UIButton *btn = (UIButton *)[cardView viewWithTag:88995];
         if (!btn) {
             btn = [UIButton buttonWithType:UIButtonTypeCustom];
             btn.tag = 88995;
-            btn.backgroundColor = [UIColor clearColor];
-            btn.layer.cornerRadius = 0;
-            btn.layer.masksToBounds = NO;
+            btn.backgroundColor = cardBg;
+            btn.layer.cornerRadius = 14.0;
+            if (@available(iOS 11.0, *)) {
+                btn.layer.maskedCorners = kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
+            }
+            btn.layer.masksToBounds = YES;
             
             UIImageView *iv = [[UIImageView alloc] initWithFrame:CGRectMake(iconX, iconY, iconW, iconH)];
             iv.tag = 88997;
@@ -6690,7 +6720,7 @@ static void bht_setupPanelFullRowStickerDownload(UIViewController *vc) {
                 if (!icon) icon = [UIImage systemImageNamed:@"square.and.arrow.down" withConfiguration:cfg];
             }
             iv.image = [icon imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-            iv.tintColor = sampleIV ? sampleIV.tintColor : [UIColor colorWithWhite:0.90 alpha:1.0];
+            iv.tintColor = [UIColor whiteColor];
             [btn addSubview:iv];
             
             UILabel *tl = [[UILabel alloc] initWithFrame:CGRectMake(lblX, 0, lblW, rowH)];
@@ -6698,17 +6728,24 @@ static void bht_setupPanelFullRowStickerDownload(UIViewController *vc) {
             tl.userInteractionEnabled = NO;
             tl.text = [BHIManager isTurkish] ? @"Çıkartmayı fotoğraflara indir" : @"Download sticker to Photos";
             tl.font = sampleLbl ? sampleLbl.font : [UIFont systemFontOfSize:15.0 weight:UIFontWeightRegular];
-            tl.textColor = sampleLbl ? sampleLbl.textColor : [UIColor colorWithWhite:0.90 alpha:1.0];
+            tl.textColor = sampleLbl ? sampleLbl.textColor : [UIColor colorWithWhite:0.92 alpha:1.0];
             tl.backgroundColor = [UIColor clearColor];
             [btn addSubview:tl];
             
             [btn addTarget:vc action:@selector(bht_onPanelFullRowDownloadTapped) forControlEvents:UIControlEventTouchUpInside];
             [cardView addSubview:btn];
         } else {
+            btn.backgroundColor = cardBg;
+            btn.layer.cornerRadius = 14.0;
+            if (@available(iOS 11.0, *)) {
+                btn.layer.maskedCorners = kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
+            }
+            btn.layer.masksToBounds = YES;
+            
             UIImageView *iv = (UIImageView *)[btn viewWithTag:88997];
             if (iv) {
                 iv.frame = CGRectMake(iconX, iconY, iconW, iconH);
-                iv.tintColor = sampleIV ? sampleIV.tintColor : [UIColor colorWithWhite:0.90 alpha:1.0];
+                iv.tintColor = [UIColor whiteColor];
             }
             UILabel *tl = (UILabel *)[btn viewWithTag:88998];
             if (tl) {
