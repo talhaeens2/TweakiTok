@@ -7,8 +7,11 @@ extern "C" {
 
 /**
  * Global Crash Logger for TweakiTok.
- * Hooks uncaught Objective-C/Swift exceptions and POSIX signals (SIGSEGV, SIGBUS, SIGABRT, SIGILL, etc.)
- * Writes detailed diagnostic reports to <Documents>/TweakiTok_Crash_<Date_Time>.txt when Developer Mode is enabled.
+ * - Captures uncaught Objective-C/Swift exceptions.
+ * - Catches fatal POSIX signals (SIGSEGV, SIGBUS, SIGABRT, SIGILL).
+ * - Tracks application lifecycle and detects abnormal terminations (Watchdog 0x8BADF00D, SIGKILL, Jetsam OOM)
+ *   generating diagnostic reports in <Documents>/TweakiTok_Crash_<Date_Time>.txt.
+ * - Creates an initial placeholder file so the 'TikTok' folder immediately appears in the iOS Files app.
  */
 void TTK_SetupGlobalCrashLogger(void);
 
@@ -18,9 +21,19 @@ void TTK_SetupGlobalCrashLogger(void);
 NSString *TTK_GetCrashLogFilePath(void);
 
 /**
- * Returns whether Developer Mode (crash logging) is currently active.
+ * Returns whether Developer Mode is enabled.
  */
 BOOL TTK_IsDeveloperModeEnabled(void);
+
+/**
+ * Records a diagnostic lifecycle breadcrumb (e.g., scene transitions, feed events).
+ */
+void TTK_RecordBreadcrumb(const char *format, ...);
+
+/**
+ * Marks that the application session exited or suspended cleanly.
+ */
+void TTK_RecordCleanExit(void);
 
 #ifdef __cplusplus
 }

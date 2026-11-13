@@ -16,6 +16,7 @@
 #import "OfflineVideosLimit.h"
 #import "LabsViewController.h"
 #import "../BHIManager.h"
+#import "../CrashLogger.h"
 
 @interface ViewController ()
 @property (nonatomic, strong) UITableView *staticTable;
@@ -168,7 +169,7 @@
         case 10: return 1;
         case 11: return 1;
         case 12: return 2;
-        case 13: return 2;
+        case 13: return 3;
         default: return 0;
     }
 }
@@ -663,9 +664,30 @@
         switch (indexPath.row) {
             case 0:
                 return [self createSwitchCellWithTitle:tr ? @"Geliştirici Modu" : @"Developer Mode"
-                                                Detail:tr ? @"Çökme günlüklerini (crash log) Dosyalar uygulamasında tarih ve saat ile (TweakiTok_Crash_*.txt) kaydeder" : @"Logs timestamped app crashes (TweakiTok_Crash_*.txt) to Files app for debugging"
+                                                Detail:tr ? @"Ayrıntılı sistem ve hata ayıklama bildirimlerini aktifleştirir" : @"Enables verbose diagnostics and debug logging"
                                                    Key:@"developer_mode"];
             case 1: {
+                UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:nil];
+                cell.textLabel.text = tr ? @"Çökme Günlüklerini Paylaş" : @"Share Crash Logs";
+                cell.detailTextLabel.text = tr ? @"Son çökme veya Watchdog raporunu görüntüler ve paylaşır" : @"View and share the latest crash or watchdog report";
+                cell.detailTextLabel.textColor = [UIColor systemGrayColor];
+                cell.detailTextLabel.numberOfLines = 0;
+                
+                UIButton *shareBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+                [shareBtn setTitle:tr ? @"Paylaş" : @"Share" forState:UIControlStateNormal];
+                [shareBtn setTitleColor:[UIColor systemBlueColor] forState:UIControlStateNormal];
+                shareBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
+                shareBtn.backgroundColor = [[UIColor systemBlueColor] colorWithAlphaComponent:0.12];
+                shareBtn.layer.cornerRadius = 14;
+                shareBtn.layer.masksToBounds = YES;
+                shareBtn.contentEdgeInsets = UIEdgeInsetsMake(6, 14, 6, 14);
+                [shareBtn sizeToFit];
+                [shareBtn addTarget:self action:@selector(shareCrashLogButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
+                cell.accessoryView = shareBtn;
+                cell.selectionStyle = UITableViewCellSelectionStyleNone;
+                return cell;
+            }
+            case 2: {
                 UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:nil];
                 cell.textLabel.text = tr ? @"Ayarları Sıfırla" : @"Reset Settings";
                 cell.detailTextLabel.text = tr ? @"Tüm ayarları ilk yükleme varsayılanlarına döndürür" : @"Reset all settings back to factory defaults";
@@ -780,10 +802,35 @@
             [self importSettingsButtonTapped:nil];
         }
     }
-    else if (indexPath.section == 13 && indexPath.row == 1) {
+    else if (indexPath.section == 13) {
         [tableView deselectRowAtIndexPath:indexPath animated:YES];
-        [self resetSettingsButtonTapped:nil];
+        if (indexPath.row == 1) {
+            [self shareCrashLogButtonTapped:nil];
+        } else if (indexPath.row == 2) {
+            [self resetSettingsButtonTapped:nil];
+        }
     }
+}
+
+- (void)shareCrashLogButtonTapped:(id)sender {
+    BOOL tr = [BHIManager isTurkish];
+    NSString *crashPath = TTK_GetCrashLogFilePath();
+    if (!crashPath || ![[NSFileManager defaultManager] fileExistsAtPath:crashPath]) {
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:tr ? @"Çökme Raporu Bulunamadı" : @"No Crash Log Found"
+                                                                       message:tr ? @"Henüz bir çökme raporu oluşmamış. Uygulama stabil çalışıyor." : @"No crash reports found on disk yet. App is running stably."
+                                                                preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:tr ? @"Tamam" : @"OK" style:UIAlertActionStyleCancel handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
+        return;
+    }
+    
+    NSURL *fileURL = [NSURL fileURLWithPath:crashPath];
+    UIActivityViewController *activityVC = [[UIActivityViewController alloc] initWithActivityItems:@[fileURL] applicationActivities:nil];
+    if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
+        activityVC.popoverPresentationController.sourceView = self.view;
+        activityVC.popoverPresentationController.sourceRect = CGRectMake(self.view.bounds.size.width / 2, self.view.bounds.size.height / 2, 0, 0);
+    }
+    [self presentViewController:activityVC animated:YES completion:nil];
 }
 
 - (void)exportSettingsButtonTapped:(id)sender {

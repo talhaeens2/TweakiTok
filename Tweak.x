@@ -388,6 +388,7 @@ static void showLikeConfirmation(void (^okHandler)(void)) {
 static BOOL isAuthenticationShowed = FALSE;
 - (void)applicationDidBecomeActive:(id)arg1 { // old app lock TODO: add face-id
   %orig;
+  TTK_RecordBreadcrumb("AppDelegate: applicationDidBecomeActive");
   [[BHTRefreshRateManager sharedManager] updateRefreshRate];
 
   if ([BHIManager appLock] && !isAuthenticationShowed) {
@@ -401,7 +402,19 @@ static BOOL isAuthenticationShowed = FALSE;
 
 - (void)applicationWillEnterForeground:(id)arg1 {
   %orig;
+  TTK_RecordBreadcrumb("AppDelegate: applicationWillEnterForeground");
   isAuthenticationShowed = FALSE;
+}
+
+- (void)applicationDidEnterBackground:(id)arg1 {
+  %orig;
+  TTK_RecordBreadcrumb("AppDelegate: applicationDidEnterBackground");
+}
+
+- (void)applicationWillTerminate:(id)arg1 {
+  %orig;
+  TTK_RecordBreadcrumb("AppDelegate: applicationWillTerminate");
+  TTK_RecordCleanExit();
 }
 %end
 
@@ -2189,21 +2202,36 @@ static void bht_onActiveVideoChanged(AWEAwemeBaseViewController *newVC) {
 }
 
 static void bht_stopPlaybackTracker(void) {
+    if (![NSThread isMainThread]) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            bht_stopPlaybackTracker();
+        });
+        return;
+    }
     if (sPlaybackPollTimer) {
-        dispatch_source_cancel(sPlaybackPollTimer);
+        dispatch_source_t timerToCancel = sPlaybackPollTimer;
         sPlaybackPollTimer = nil;
+        dispatch_source_cancel(timerToCancel);
     }
 }
 
 static void bht_startPlaybackTracker(TTVideoEngine *engine) {
+    if (![NSThread isMainThread]) {
+        __weak TTVideoEngine *weakEng = engine;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            bht_startPlaybackTracker(weakEng);
+        });
+        return;
+    }
     bht_stopPlaybackTracker();
     if (![BHIManager resumeVideoPlayback] || !engine) return;
     
-    sPlaybackPollTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
-    if (sPlaybackPollTimer) {
-        dispatch_source_set_timer(sPlaybackPollTimer, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)), (uint64_t)(0.35 * NSEC_PER_SEC), (uint64_t)(0.1 * NSEC_PER_SEC));
+    dispatch_source_t timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
+    if (timer) {
+        sPlaybackPollTimer = timer;
+        dispatch_source_set_timer(timer, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)), (uint64_t)(0.35 * NSEC_PER_SEC), (uint64_t)(0.1 * NSEC_PER_SEC));
         __weak TTVideoEngine *weakEngine = engine;
-        dispatch_source_set_event_handler(sPlaybackPollTimer, ^{
+        dispatch_source_set_event_handler(timer, ^{
             TTVideoEngine *strongEngine = weakEngine;
             if (!strongEngine || strongEngine != sCurrentActiveVideoEngine) {
                 bht_stopPlaybackTracker();
@@ -2215,7 +2243,7 @@ static void bht_startPlaybackTracker(TTVideoEngine *engine) {
                 bht_recordCurrentPlaybackPosition(curr, dur);
             }
         });
-        dispatch_resume(sPlaybackPollTimer);
+        dispatch_resume(timer);
     }
 }
 
@@ -7164,28 +7192,40 @@ static void bht_injectDownloadIconIntoStickerViewer(UIView *view) {
         @"/bin/sh", @"/bin/bash",
     ];
     %init;
+    TTK_SetupGlobalCrashLogger();
     dispatch_async(dispatch_get_main_queue(), ^{
         [[BHTRefreshRateManager sharedManager] updateRefreshRate];
         [BHIManager syncWithTikTokLanguageIfNeeded];
-        TTK_SetupGlobalCrashLogger();
     });
-    [[NSNotificationCenter defaultCenter] addObserverForName:@"ALPLocalizationsLanguageChangedNotification" object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification * _Nonnull note) {
-        [BHIManager handleTikTokLanguageDidChange];
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"ALPLocalizationsLanguageChangedNotification" object:nil queue:nil usingBlock:^(NSNotification * _Nonnull note) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [BHIManager handleTikTokLanguageDidChange];
+        });
     }];
-    [[NSNotificationCenter defaultCenter] addObserverForName:@"localizationsLanguageChangedNotificationName" object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification * _Nonnull note) {
-        [BHIManager handleTikTokLanguageDidChange];
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"localizationsLanguageChangedNotificationName" object:nil queue:nil usingBlock:^(NSNotification * _Nonnull note) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [BHIManager handleTikTokLanguageDidChange];
+        });
     }];
-    [[NSNotificationCenter defaultCenter] addObserverForName:@"AWEContentLanguageDidChangedNotification" object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification * _Nonnull note) {
-        [BHIManager handleTikTokLanguageDidChange];
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"AWEContentLanguageDidChangedNotification" object:nil queue:nil usingBlock:^(NSNotification * _Nonnull note) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [BHIManager handleTikTokLanguageDidChange];
+        });
     }];
-    [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification * _Nonnull note) {
-        [BHIManager syncWithTikTokLanguageIfNeeded];
+    [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:nil usingBlock:^(NSNotification * _Nonnull note) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [BHIManager syncWithTikTokLanguageIfNeeded];
+        });
     }];
-    [[NSNotificationCenter defaultCenter] addObserverForName:@"TweakiTokLanguageDidChangeNotification" object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification * _Nonnull note) {
-        reloadTikTokSettingsTables();
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"TweakiTokLanguageDidChangeNotification" object:nil queue:nil usingBlock:^(NSNotification * _Nonnull note) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            reloadTikTokSettingsTables();
+        });
     }];
-    [[NSNotificationCenter defaultCenter] addObserverForName:@"TweakiTokSettingsDidDismissNotification" object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification * _Nonnull note) {
-        reloadTikTokSettingsTables();
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"TweakiTokSettingsDidDismissNotification" object:nil queue:nil usingBlock:^(NSNotification * _Nonnull note) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            reloadTikTokSettingsTables();
+        });
     }];
 }
 
