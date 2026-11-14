@@ -70,6 +70,7 @@ Ready-to-install `.deb` packages and modded `.ipa` releases are automatically co
 - [ ] **Keep unsent messages**: Keep deleted/unsent messages in chat.
 - [ ] **Ghost mode**: Hide view history, online presence, read receipts & typing.
 - [ ] **Keep a streak going**: Auto-send scheduled messages to maintain streaks.
+- [ ] **Open external links directly**: Open links in your phone's default browser instead of TikTok's in-app browser.
 
 ## License
 
