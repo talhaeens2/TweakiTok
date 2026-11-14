@@ -50,7 +50,7 @@ An awesome, modern TikTok tweak for iOS that blocks ads and unlocks more feature
 - **Disable Sensitive Content Warnings**: Bypasses intrusive content warning screens.
 - **Restart Notice Banner**: Adaptive toast notification prompting restart when settings change.
 - **Backup & Restore Settings**: Export and import settings to/from date-stamped .json files via Files app.
-- **Developer Mode & Global Crash Logger**: Intercepts Objective-C exceptions and POSIX signals, saving diagnostic crash logs with call stack traces to date-stamped files.
+- **Developer Mode & Global Crash Logger**: Captures crashes and saves detailed crash logs for debugging.
 - **Security Bypasses**: Bypasses jailbreak detection and environment checks.
 
 ## GitHub Actions & Prebuilt Releases
@@ -70,7 +70,7 @@ Ready-to-install `.deb` packages and modded `.ipa` releases are automatically co
 - [ ] **Keep unsent messages**: Keep deleted/unsent messages in chat.
 - [ ] **Ghost mode**: Hide view history, online presence, read receipts & typing.
 - [ ] **Keep a streak going**: Auto-send scheduled messages to maintain streaks.
-- [ ] **Open external links directly**: Open links in your phone's default browser instead of TikTok's in-app browser.
+- [ ] **Open external links directly**: Open links in your default browser instead of TikTok's browser.
 
 ## License
 

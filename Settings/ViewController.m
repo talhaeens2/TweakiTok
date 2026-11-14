@@ -662,10 +662,13 @@
     }
     else if (indexPath.section == 13) {
         switch (indexPath.row) {
-            case 0:
-                return [self createSwitchCellWithTitle:tr ? @"Geliştirici Modu" : @"Developer Mode"
-                                                Detail:tr ? @"Ayrıntılı sistem ve hata ayıklama bildirimlerini aktifleştirir" : @"Enables verbose diagnostics and debug logging"
-                                                   Key:@"developer_mode"];
+            case 0: {
+                UITableViewCell *cell = [self createSwitchCellWithTitle:tr ? @"Geliştirici Modu" : @"Developer Mode"
+                                                                Detail:tr ? @"Ayrıntılı sistem ve hata ayıklama bildirimlerini aktifleştirir" : @"Enables verbose diagnostics and debug logging"
+                                                                   Key:@"developer_mode"];
+                cell.separatorInset = UIEdgeInsetsMake(0, 10000, 0, 0);
+                return cell;
+            }
             case 1: {
                 UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:nil];
                 cell.textLabel.text = tr ? @"Çökme Günlüklerini Paylaş" : @"Share Crash Logs";
@@ -728,7 +731,7 @@
 }
 
 - (void)tableView:(UITableView *)tableView willDisplayCell:(UITableViewCell *)cell forRowAtIndexPath:(NSIndexPath *)indexPath {
-    if (indexPath.section == 12 && indexPath.row == 0) {
+    if ((indexPath.section == 12 && indexPath.row == 0) || (indexPath.section == 13 && indexPath.row == 0)) {
         cell.separatorInset = UIEdgeInsetsMake(0, tableView.bounds.size.width + 1000, 0, 0);
     }
 }
