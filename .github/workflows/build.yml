@@ -11,12 +11,12 @@ on:
         description: 'Decrypted TikTok IPA Direct Download URL (Optional)'
         required: false
         type: string
-        default: 'https://github.com/talhaeenss/TweakiTok/releases/download/base-ipa-47.7.0/com.zhiliaoapp.musically-47.7.0-Decrypted.ipa'
+        default: 'https://github.com/talhaeens2/TweakiTok/releases/download/base-ipa-47.8.0/com.zhiliaoapp.musically-47.8.0-Decrypted.ipa'
       release_tag:
         description: 'GitHub Release tag containing the base IPA (Optional, e.g. base-ipa)'
         required: false
         type: string
-        default: 'base-ipa-47.7.0'
+        default: 'base-ipa-47.8.0'
 
 jobs:
   build:
@@ -170,14 +170,14 @@ jobs:
 
           RELEASE_TAG="${{ github.event.inputs.release_tag }}"
           if [ -z "$RELEASE_TAG" ] && [ -z "${{ github.event.inputs.ipa_url }}" ]; then
-            RELEASE_TAG="base-ipa-47.7.0"
+            RELEASE_TAG="base-ipa-47.8.0"
           fi
 
           # 1. Download from URL if provided
           if [ -n "${{ github.event.inputs.ipa_url }}" ]; then
             echo "Downloading IPA from URL..."
-            curl -L -o ipa_working/com.zhiliaoapp.musically-47.7.0-Decrypted.ipa "${{ github.event.inputs.ipa_url }}"
-            IPA_FILE="ipa_working/com.zhiliaoapp.musically-47.7.0-Decrypted.ipa"
+            curl -L -o ipa_working/com.zhiliaoapp.musically-47.8.0-Decrypted.ipa "${{ github.event.inputs.ipa_url }}"
+            IPA_FILE="ipa_working/com.zhiliaoapp.musically-47.8.0-Decrypted.ipa"
           # 2. Or download from GitHub Release in current repo
           elif [ -n "$RELEASE_TAG" ]; then
             echo "Checking GitHub Release '$RELEASE_TAG' in current repository..."
@@ -192,9 +192,9 @@ jobs:
           # 3. Fallback download from known live release
           if [ -z "$IPA_FILE" ] || [ ! -f "$IPA_FILE" ]; then
             echo "Downloading fallback IPA from base-ipa release asset..."
-            curl -L -o ipa_working/com.zhiliaoapp.musically-47.7.0-Decrypted.ipa "https://github.com/talhaeenss/TweakiTok/releases/download/base-ipa-47.7.0/com.zhiliaoapp.musically-47.7.0-Decrypted.ipa" || true
-            if [ -f ipa_working/com.zhiliaoapp.musically-47.7.0-Decrypted.ipa ]; then
-              IPA_FILE="ipa_working/com.zhiliaoapp.musically-47.7.0-Decrypted.ipa"
+            curl -L -o ipa_working/com.zhiliaoapp.musically-47.8.0-Decrypted.ipa "https://github.com/talhaeens2/TweakiTok/releases/download/base-ipa-47.8.0/com.zhiliaoapp.musically-47.8.0-Decrypted.ipa" || true
+            if [ -f ipa_working/com.zhiliaoapp.musically-47.8.0-Decrypted.ipa ]; then
+              IPA_FILE="ipa_working/com.zhiliaoapp.musically-47.8.0-Decrypted.ipa"
               NEED_UPLOAD_BASE_RELEASE=true
             fi
           fi
@@ -202,9 +202,9 @@ jobs:
           # If we downloaded via fallback and the base-ipa release doesn't exist on this repo yet, create it!
           if [ "$NEED_UPLOAD_BASE_RELEASE" = true ]; then
             echo "Creating base-ipa release in current repo for future instant builds..."
-            gh release create base-ipa-47.7.0 ipa_working/com.zhiliaoapp.musically-47.7.0-Decrypted.ipa \
-              --title "Base Decrypted TikTok IPA (v47.7.0)" \
-              --notes "Base decrypted TikTok IPA (com.zhiliaoapp.musically-47.7.0-Decrypted.ipa) used for TweakiTok builds." || true
+            gh release create base-ipa-47.8.0 ipa_working/com.zhiliaoapp.musically-47.8.0-Decrypted.ipa \
+              --title "Base Decrypted TikTok IPA (v47.8.0)" \
+              --notes "Base decrypted TikTok IPA (com.zhiliaoapp.musically-47.8.0-Decrypted.ipa) used for TweakiTok builds." || true
           fi
 
           if [ -z "$IPA_FILE" ] || [ ! -f "$IPA_FILE" ]; then
