@@ -4,5 +4,7 @@ packages/
 .DS_Store
 com.zhiliaoapp.musically_46.5.0_decrypted/
 *.ipa
+*.crdownload
+scripts/
 yapilanlar.txt
 calismamantigi.md
